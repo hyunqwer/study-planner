@@ -140,7 +140,9 @@ function renderTable() {
       const done = log?.completedPages || 0;
       const isToday = d === todayStr;
       const label = planned > 0 ? `${planned}쪽` : '—';
-      const doneText = done > 0 ? `<br><span class="text-xs text-success">${done}쪽</span>` : '';
+      const doneText = done > 0
+        ? `<br><a class="text-xs text-success font-semibold" href="mission.html?bookId=${state.book.id}&date=${d}">${done}쪽 수정</a>`
+        : '';
       const todayClass = isToday ? ' class="today"' : '';
       return `<td${todayClass}>${label}${doneText}</td>`;
     }).join('');

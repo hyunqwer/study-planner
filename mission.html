@@ -49,7 +49,10 @@
         </div>
         <h3 class="mb-8">미션 완료</h3>
         <p class="text-sm text-2 mb-24" id="done-summary"></p>
-        <a href="index.html" class="btn btn-primary btn-lg">홈으로</a>
+        <div style="display:flex;gap:8px">
+          <a href="index.html" class="btn btn-ghost btn-lg flex-1">홈으로</a>
+          <button class="btn btn-primary btn-lg flex-1" onclick="editTodayLog()">기록 수정</button>
+        </div>
       </div>
     </div>
 
@@ -66,7 +69,7 @@
 
       <!-- 오늘 페이지 입력 -->
       <div class="card">
-        <div class="card-label">오늘 어디까지 했어?</div>
+        <div class="card-label" id="action-title">오늘 어디까지 했어?</div>
 
         <!-- 시작/끝 페이지 -->
         <div class="form-row mb-12">
@@ -84,7 +87,7 @@
 
         <!-- 완료 쪽수 자동 표시 -->
         <div id="pages-calc" style="display:none;padding:10px 12px;background:var(--surface-2);border-radius:var(--r);font-size:13px;color:var(--text-2)">
-          오늘 <strong id="pages-calc-num" style="color:var(--primary)">0</strong>쪽 완료
+          <span id="pages-calc-label">오늘</span> <strong id="pages-calc-num" style="color:var(--primary)">0</strong>쪽 완료
         </div>
       </div>
 
@@ -92,27 +95,27 @@
       <div class="card">
         <div class="card-label">난이도는?</div>
         <div class="chip-group" id="difficulty-chips">
-          <button class="chip" onclick="selectChip('difficulty-chips',this,'easy')">쉬웠다</button>
-          <button class="chip" onclick="selectChip('difficulty-chips',this,'medium')">적당했다</button>
-          <button class="chip" onclick="selectChip('difficulty-chips',this,'hard')">어려웠다</button>
-          <button class="chip" onclick="selectChip('difficulty-chips',this,'vhard')">너무 어려웠다</button>
+          <button class="chip" data-value="easy" onclick="selectChip('difficulty-chips',this,'easy')">쉬웠다</button>
+          <button class="chip" data-value="medium" onclick="selectChip('difficulty-chips',this,'medium')">적당했다</button>
+          <button class="chip" data-value="hard" onclick="selectChip('difficulty-chips',this,'hard')">어려웠다</button>
+          <button class="chip" data-value="vhard" onclick="selectChip('difficulty-chips',this,'vhard')">너무 어려웠다</button>
         </div>
       </div>
 
       <!-- 못한 경우 이유 -->
       <div class="card" id="skip-card" style="display:none">
-        <div class="card-label">오늘 못 한 이유</div>
+        <div class="card-label" id="skip-title">오늘 못 한 이유</div>
         <div class="chip-group" id="reason-chips">
-          <button class="chip" onclick="selectChip('reason-chips',this,'no-time')">시간이 없었다</button>
-          <button class="chip" onclick="selectChip('reason-chips',this,'hard')">문제가 어려웠다</button>
-          <button class="chip" onclick="selectChip('reason-chips',this,'lazy')">귀찮았다</button>
-          <button class="chip" onclick="selectChip('reason-chips',this,'forgot')">까먹었다</button>
-          <button class="chip" onclick="selectChip('reason-chips',this,'schedule')">다른 일이 있었다</button>
+          <button class="chip" data-value="no-time" onclick="selectChip('reason-chips',this,'no-time')">시간이 없었다</button>
+          <button class="chip" data-value="hard" onclick="selectChip('reason-chips',this,'hard')">문제가 어려웠다</button>
+          <button class="chip" data-value="lazy" onclick="selectChip('reason-chips',this,'lazy')">귀찮았다</button>
+          <button class="chip" data-value="forgot" onclick="selectChip('reason-chips',this,'forgot')">까먹었다</button>
+          <button class="chip" data-value="schedule" onclick="selectChip('reason-chips',this,'schedule')">다른 일이 있었다</button>
         </div>
       </div>
 
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn btn-ghost btn-md flex-1" onclick="submitSkip()">오늘은 못 했어</button>
+        <button class="btn btn-ghost btn-md flex-1" onclick="submitSkip()" id="skip-btn">오늘은 못 했어</button>
         <button class="btn btn-primary btn-md" style="flex:2" onclick="submitMission()" id="submit-btn">기록 저장</button>
       </div>
     </div>
@@ -144,12 +147,38 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
-let currentBook = null, todayPlannedPages = 0;
+let currentBook = null, todayPlannedPages = 0, currentLog = null;
 let selectedDifficulty = '', selectedReason = '';
-const todayStr = today();
+const selectedDateStr = getParam('date') || today();
+const dateWord = selectedDateStr === today() ? '오늘' : '이날';
 
-document.getElementById('today-label').textContent =
-  `${new Date().getMonth()+1}월 ${new Date().getDate()}일 · ${DAY_KO[new Date().getDay()]}요일`;
+function getWeekDatesFor(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const dd = new Date(mon);
+    dd.setDate(mon.getDate() + i);
+    return dd.toISOString().slice(0, 10);
+  });
+}
+
+function weekIndexForDate(dateStr) {
+  const day = new Date(dateStr).getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function formatMissionDate(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getMonth()+1}월 ${d.getDate()}일 · ${DAY_KO[d.getDay()]}요일`;
+}
+
+document.getElementById('today-label').textContent = formatMissionDate(selectedDateStr);
+document.getElementById('action-title').textContent = `${dateWord} 어디까지 했어?`;
+document.getElementById('pages-calc-label').textContent = dateWord;
+document.getElementById('skip-title').textContent = `${dateWord} 못 한 이유`;
+document.getElementById('skip-btn').textContent = `${dateWord}은 못 했어`;
 
 // 시작/끝 페이지 입력 시 완료 쪽수 자동 계산
 ['start-page','end-page'].forEach(id => {
@@ -176,6 +205,40 @@ function selectChip(groupId, el, val) {
   if (groupId === 'reason-chips') selectedReason = val;
 }
 
+function selectChipValue(groupId, val) {
+  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('selected'));
+  if (groupId === 'difficulty-chips') selectedDifficulty = val || '';
+  if (groupId === 'reason-chips') selectedReason = val || '';
+  if (!val) return;
+  const target = document.querySelector(`#${groupId} .chip[data-value="${val}"]`);
+  if (target) target.classList.add('selected');
+}
+
+function showEditForm(log) {
+  currentLog = log || {};
+  document.getElementById('done-section').style.display = 'none';
+  document.getElementById('rest-section').style.display = 'none';
+  document.getElementById('action-section').style.display = 'block';
+  document.getElementById('action-title').textContent = '기록을 수정해 줘';
+  document.getElementById('submit-btn').textContent = '수정 저장';
+  document.getElementById('skip-card').style.display = currentLog.status === 'skip' ? 'block' : 'none';
+
+  if (currentLog.startPage && currentLog.endPage) {
+    document.getElementById('start-page').value = currentLog.startPage;
+    document.getElementById('end-page').value = currentLog.endPage;
+  } else if (currentLog.completedPages > 0) {
+    document.getElementById('start-page').value = 1;
+    document.getElementById('end-page').value = currentLog.completedPages;
+  }
+  selectChipValue('difficulty-chips', currentLog.difficulty || '');
+  selectChipValue('reason-chips', currentLog.reason || '');
+  updateCalc();
+}
+
+function editTodayLog() {
+  showEditForm(currentLog);
+}
+
 async function submitMission() {
   const startPage = parseInt(document.getElementById('start-page').value) || 0;
   const endPage   = parseInt(document.getElementById('end-page').value)   || 0;
@@ -187,7 +250,7 @@ async function submitMission() {
   btn.disabled = true; btn.textContent = '저장 중...';
   try {
     await saveDailyLog(currentBook.id, {
-      date: todayStr,
+      date: selectedDateStr,
       status: completedPages >= todayPlannedPages ? 'done' : 'partial',
       plannedPages: todayPlannedPages,
       completedPages,
@@ -196,11 +259,12 @@ async function submitMission() {
       difficulty: selectedDifficulty,
       reason: selectedReason,
     });
-    showToast('기록 완료');
-    setTimeout(() => location.href = 'index.html', 1000);
+    showToast(currentLog ? '기록 수정 완료' : '기록 완료');
+    const nextUrl = currentLog ? `mission.html?bookId=${currentBook.id}&date=${selectedDateStr}` : 'index.html';
+    setTimeout(() => location.href = nextUrl, 1000);
   } catch(e) {
     console.error(e); showToast('저장 실패');
-    btn.disabled = false; btn.textContent = '기록 저장';
+    btn.disabled = false; btn.textContent = currentLog ? '수정 저장' : '기록 저장';
   }
 }
 
@@ -210,7 +274,7 @@ async function submitSkip() {
   if (!selectedReason) { showToast('못 한 이유를 선택해 줘'); return; }
   try {
     await saveDailyLog(currentBook.id, {
-      date: todayStr, status: 'skip',
+      date: selectedDateStr, status: 'skip',
       plannedPages: todayPlannedPages, completedPages: 0,
       reason: selectedReason,
     });
@@ -226,7 +290,7 @@ async function renderMissionList(books) {
   for (const book of books) {
     const plan = await getOrCreateWeeklyPlan(book, weekDates);
     const planned = plan.dailyPages[todayIdx] || 0;
-    const log = await getDailyLog(book.id, todayStr);
+    const log = await getDailyLog(book.id, today());
     const badge = planned === 0
       ? '<span class="badge badge-muted">휴식</span>'
       : log && log.status === 'done'
@@ -273,11 +337,17 @@ async function init() {
   currentBook = await getBook(bookId);
   if (!currentBook) { document.getElementById('mission-main-title').textContent = '진행 중인 책 없음'; return; }
 
-  const todayLog = await getDailyLog(currentBook.id, todayStr);
+  const weekDates = getWeekDatesFor(selectedDateStr);
+  const plan = await getOrCreateWeeklyPlan(currentBook, weekDates);
+  const adjustedIdx = weekIndexForDate(selectedDateStr);
+  todayPlannedPages = plan ? (plan.dailyPages[adjustedIdx] || 0) : currentBook.dailyPages || 5;
+
+  const todayLog = await getDailyLog(currentBook.id, selectedDateStr);
   if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) {
+    currentLog = todayLog;
     document.getElementById('mission-header').style.background = 'linear-gradient(135deg,#064e3b,#065f46)';
     document.getElementById('mission-tag').textContent = '완료';
-    document.getElementById('mission-main-title').textContent = '오늘 기록 완료';
+    document.getElementById('mission-main-title').textContent = '기록 완료';
     const pageInfo = todayLog.startPage && todayLog.endPage
       ? `${todayLog.startPage}~${todayLog.endPage}쪽 (${todayLog.completedPages}쪽)`
       : `${todayLog.completedPages}쪽`;
@@ -287,26 +357,23 @@ async function init() {
     return;
   }
 
-  const weekDates = getThisWeekDates();
-  const plan = await getOrCreateWeeklyPlan(currentBook, weekDates);
-  const adjustedIdx = weekIndexForToday();
-  todayPlannedPages = plan ? (plan.dailyPages[adjustedIdx] || 0) : currentBook.dailyPages || 5;
-
   if (todayPlannedPages === 0) {
-    document.getElementById('mission-main-title').textContent = '오늘은 휴식일';
-    document.getElementById('mission-sub').textContent = '내일 다시 시작';
+    document.getElementById('mission-main-title').textContent = '이날은 휴식일';
+    document.getElementById('mission-sub').textContent =
+      dateWord === '오늘' ? '내일 다시 시작' : '다음 공부일에 다시 시작';
     document.getElementById('rest-section').style.display = 'block';
     return;
   }
 
   document.getElementById('mission-main-title').textContent =
-    `오늘 목표 ${todayPlannedPages}쪽`;
+    `${dateWord} 목표 ${todayPlannedPages}쪽`;
   document.getElementById('mission-sub').textContent =
     `[${currentBook.subject}] ${currentBook.title}`;
   document.getElementById('action-section').style.display = 'block';
 
   // 이전 기록에서 끝 페이지 불러와 시작 페이지 자동 제안
   const yesterday = new Date();
+  yesterday.setTime(new Date(selectedDateStr).getTime());
   yesterday.setDate(yesterday.getDate() - 1);
   const yStr = yesterday.toISOString().slice(0, 10);
   const prevLog = await getDailyLog(currentBook.id, yStr);
