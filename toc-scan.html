@@ -741,13 +741,37 @@ function renderDifficultySummary(data) {
 
   const totalEstDays = scannedChapters.reduce((a, c) => a + (c.estimatedDays || 3), 0);
   const hardChapters = scannedChapters.filter(c => c.estimatedDifficulty === 'hard').map(c => c.title);
-  let suggestion = data.aiComment ? `<p style="margin-bottom:10px">${data.aiComment}</p>` : '';
-  suggestion += `<p>전체 ${scannedChapters.length}단원 기준으로 <strong>약 ${totalEstDays}일</strong> 예상돼.`;
+  let suggestion = data.aiComment ? `<p style="margin-bottom:10px">${normalizeCoachTone(data.aiComment)}</p>` : '';
+  suggestion += `<p>전체 ${scannedChapters.length}단원 기준으로는 <strong>약 ${totalEstDays}일</strong> 정도로 보면 돼.`;
   if (hardChapters.length) {
-    suggestion += ` <strong>${hardChapters.join(', ')}</strong> 단원은 시간을 더 넉넉하게 잡아봐.`;
+    suggestion += ` <strong>${hardChapters.join(', ')}</strong> 단원은 시간을 조금 더 넉넉하게 잡자.`;
   }
   suggestion += `</p>`;
   document.getElementById('plan-suggestion').innerHTML = suggestion;
+}
+
+function normalizeCoachTone(text = '') {
+  return String(text)
+    .trim()
+    .replace(/학생들이/g, '네가')
+    .replace(/학생이/g, '네가')
+    .replace(/학습자/g, '너')
+    .replace(/학습을/g, '공부를')
+    .replace(/학습/g, '공부')
+    .replace(/구성되어 있습니다/g, '구성되어 있어')
+    .replace(/포함하고 있습니다/g, '포함하고 있어')
+    .replace(/중요합니다/g, '중요해')
+    .replace(/필요합니다/g, '필요해')
+    .replace(/좋습니다/g, '좋아')
+    .replace(/가능합니다/g, '가능해')
+    .replace(/도움이 됩니다/g, '도움이 돼')
+    .replace(/하는 것이/g, '하는 게')
+    .replace(/있습니다/g, '있어')
+    .replace(/없습니다/g, '없어')
+    .replace(/됩니다/g, '돼')
+    .replace(/합니다/g, '해')
+    .replace(/하세요/g, '해줘')
+    .replace(/매일 꾸준히/g, '매일 조금씩 꾸준히');
 }
 
 function showResult(data) {

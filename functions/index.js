@@ -1,6 +1,30 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const OpenAI = require('openai');
 
+function normalizeCoachTone(text = '') {
+  return String(text)
+    .trim()
+    .replace(/학생들이/g, '네가')
+    .replace(/학생이/g, '네가')
+    .replace(/학습자/g, '너')
+    .replace(/학습을/g, '공부를')
+    .replace(/학습/g, '공부')
+    .replace(/구성되어 있습니다/g, '구성되어 있어')
+    .replace(/포함하고 있습니다/g, '포함하고 있어')
+    .replace(/중요합니다/g, '중요해')
+    .replace(/필요합니다/g, '필요해')
+    .replace(/좋습니다/g, '좋아')
+    .replace(/가능합니다/g, '가능해')
+    .replace(/도움이 됩니다/g, '도움이 돼')
+    .replace(/하는 것이/g, '하는 게')
+    .replace(/있습니다/g, '있어')
+    .replace(/없습니다/g, '없어')
+    .replace(/됩니다/g, '돼')
+    .replace(/합니다/g, '해')
+    .replace(/하세요/g, '해줘')
+    .replace(/매일 꾸준히/g, '매일 조금씩 꾸준히');
+}
+
 /**
  * POST /analyzeToc
  * Body: { images: ["base64...", "base64..."], mimeTypes: ["image/jpeg", ...] }
@@ -64,10 +88,15 @@ exports.analyzeToc = onRequest(
       "estimatedDays": 이 단원을 공부하는 데 예상 일수 (1~14 사이 숫자)
     }
   ],
-  "aiComment": "이 책의 특징과 학습 조언을 2~3문장으로 (한국어)"
+  "aiComment": "이 책의 특징과 학습 조언을 2~3문장으로 (한국어, 친구 같은 코치 선생님 말투)"
 }
 
 난이도 기준: easy=기초/개념, medium=응용, hard=심화/서술형
+말투 기준:
+- 초중등 아이에게 말하듯 친근한 반말 코치 톤으로 써.
+- "~해", "~하자", "~좋아", "~괜찮아", "~잡자" 같은 문장으로 끝내.
+- "습니다", "합니다", "중요합니다", "구성되어 있습니다" 같은 존댓말은 절대 쓰지 마.
+- "학생", "학습자"라고 부르지 말고 필요하면 "너" 또는 "네가"라고 말해.
 JSON만 반환. 마크다운 코드블록 사용 금지.`;
 
       const completion = await client.chat.completions.create({
@@ -96,6 +125,7 @@ JSON만 반환. 마크다운 코드블록 사용 금지.`;
         else throw new Error('AI 응답 파싱 실패');
       }
 
+      if (parsed.aiComment) parsed.aiComment = normalizeCoachTone(parsed.aiComment);
       return res.status(200).json(parsed);
 
     } catch (err) {
