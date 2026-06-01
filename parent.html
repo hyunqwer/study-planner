@@ -56,7 +56,7 @@
     <div class="card">
       <div class="card-label">이번 주 일일 기록</div>
       <table class="week-table">
-        <thead><tr><th>요일</th><th>계획</th><th>완료</th><th>난이도</th></tr></thead>
+        <thead><tr><th>요일</th><th>계획</th><th>완료</th><th>교재</th></tr></thead>
         <tbody id="p-week-tbody"></tbody>
       </table>
     </div>
@@ -99,21 +99,45 @@ const SCRIPT=[
 ];
 
 async function init() {
-  const book = await getActiveBook();
+  const books = await getActiveBooks();
   document.getElementById('loading-msg').style.display='none';
   document.getElementById('main-content').style.display='block';
-  if (!book) { document.getElementById('one-liner').textContent='진행 중인 책이 없어요.'; return; }
+  if (!books.length) { document.getElementById('one-liner').textContent='진행 중인 책이 없어요.'; return; }
 
   const weekDates = getThisWeekDates();
-  const plan = await getWeeklyPlan(book.id, weekDates[0]);
-  const weekGoal = plan ? plan.dailyPages.reduce((a,b)=>a+b,0) : 0;
-  const logs = {};
-  let weekDone = 0;
-  for (const d of weekDates) { logs[d]=await getDailyLog(book.id,d); if(logs[d]) weekDone+=(logs[d].completedPages||0); }
+  const dayRows = weekDates.map((d, i) => ({ date:d, day:DAYS[i], planned:0, done:0, books:[] }));
+  const bookSummaries = [];
+  let weekGoal = 0, weekDone = 0, totalDoneAll = 0, totalPagesAll = 0, minDaysLeft = Infinity;
+
+  for (const book of books) {
+    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+    let bookWeekDone = 0;
+    const totalDone = await getTotalCompleted(book.id);
+    totalDoneAll += totalDone;
+    totalPagesAll += book.totalPages || 0;
+    minDaysLeft = Math.min(minDaysLeft, Math.max(0, diffDays(today(), book.targetEndDate)));
+
+    weekDates.forEach((d, i) => {
+      const planned = plan.dailyPages[i] || 0;
+      dayRows[i].planned += planned;
+      if (planned > 0) dayRows[i].books.push(`[${book.subject}] ${book.title}`);
+    });
+
+    for (let i=0; i<weekDates.length; i++) {
+      const log = await getDailyLog(book.id, weekDates[i]);
+      const done = log ? (log.completedPages||0) : 0;
+      dayRows[i].done += done;
+      bookWeekDone += done;
+    }
+    const bookGoal = plan.dailyPages.reduce((a,b)=>a+b,0);
+    weekGoal += bookGoal;
+    weekDone += bookWeekDone;
+    bookSummaries.push({ title:book.title, subject:book.subject, goal:bookGoal, done:bookWeekDone, pct:bookGoal ? Math.round(bookWeekDone/bookGoal*100) : 0 });
+  }
+
   const weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
-  const totalDone = await getTotalCompleted(book.id);
-  const totalPct = Math.round(totalDone/book.totalPages*100);
-  const daysLeft = Math.max(0, diffDays(today(), book.targetEndDate));
+  const totalPct = totalPagesAll>0 ? Math.round(totalDoneAll/totalPagesAll*100) : 0;
+  const daysLeft = Number.isFinite(minDaysLeft) ? minDaysLeft : 0;
 
   document.getElementById('p-week-pct').textContent=weekPct+'%';
   document.getElementById('p-week-done').textContent=weekDone;
@@ -121,17 +145,16 @@ async function init() {
   document.getElementById('p-days-left').textContent=daysLeft;
 
   document.getElementById('one-liner').textContent =
-    weekPct>=90 ? `이번 주 [${book.title}] 목표의 ${weekPct}%를 완료했습니다. 아주 잘 하고 있어요.` :
-    weekPct>=60 ? `이번 주 ${weekGoal}쪽 중 ${weekDone}쪽 완료 (${weekPct}%). 무난하게 진행 중입니다.` :
-    `이번 주 달성률 ${weekPct}%. 조금 힘든 주였습니다. 이유를 함께 살펴보세요.`;
+    weekPct>=90 ? `이번 주 ${books.length}권 전체 목표의 ${weekPct}%를 완료했습니다. 아주 잘 하고 있어요.` :
+    weekPct>=60 ? `이번 주 전체 ${weekGoal}쪽 중 ${weekDone}쪽 완료 (${weekPct}%). 무난하게 진행 중입니다.` :
+    `이번 주 전체 달성률 ${weekPct}%. 어느 요일과 교재가 부담이었는지 함께 살펴보세요.`;
 
   document.getElementById('coach-tip').innerHTML =
     weekPct>=80 ? `아이에게: <em>"이번 주 계획을 잘 지켰어. 스스로 한 거야!"</em><br>지금은 개입보다 <strong>칭찬</strong>이 먼저입니다.` :
     weekPct>=50 ? `아이에게: <em>"다 못 지킨 것보다, 왜 어려웠는지 알고 조정한 게 더 중요해."</em><br><strong>다음 주 계획 조정</strong>을 도와주세요.` :
     `아이에게: <em>"이번 주는 힘들었지? 계획이 너무 많았던 건 아닐까?"</em><br>분량을 줄이거나 <strong>목표일을 조정</strong>하는 것도 전략입니다.`;
 
-  const rv = await db.collection('users').doc(USER_ID)
-    .collection('books').doc(book.id)
+  const rv = await db.collection('users').doc(getUserId())
     .collection('weeklyReviews').doc(weekDates[0]).get();
   if (rv.exists) {
     const d=rv.data();
@@ -142,15 +165,18 @@ async function init() {
   }
 
   const tbody = document.getElementById('p-week-tbody');
-  weekDates.forEach((d,i)=>{
-    const log=logs[d], planned=plan?(plan.dailyPages[i]||0):0, done=log?log.completedPages:null;
+  dayRows.forEach(row=>{
     tbody.innerHTML+=`<tr>
-      <td><strong>${DAYS[i]}</strong></td>
-      <td>${planned>0?planned+'쪽':'휴식'}</td>
-      <td>${done!==null?done+'쪽':'—'}</td>
-      <td><span class="text-sm text-2">${DIFF[log&&log.difficulty]||'—'}</span></td>
+      <td><strong>${row.day}</strong></td>
+      <td>${row.planned>0?row.planned+'쪽':'휴식'}</td>
+      <td>${row.done>0?row.done+'쪽':'—'}</td>
+      <td><span class="text-sm text-2">${row.books.length ? row.books.length + '권' : '—'}</span></td>
     </tr>`;
   });
+
+  document.getElementById('child-feeling').innerHTML += bookSummaries.length ? `<br><br>` + bookSummaries.map(b =>
+    `[${b.subject}] ${b.title}: ${b.done}/${b.goal}쪽 (${b.pct}%)`
+  ).join('<br>') : '';
 
   document.getElementById('script-rows').innerHTML=SCRIPT.map(([k,v])=>`
     <div class="info-row" style="align-items:flex-start">

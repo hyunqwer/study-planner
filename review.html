@@ -25,13 +25,18 @@
 
     <!-- 1단계: 결과 -->
     <div class="card mb-12">
-      <div class="card-label">이번 주 결과</div>
+      <div class="card-label">이번 주 전체 결과</div>
       <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1" id="result-pct">—</div>
       <p class="text-sm text-2 mt-8" id="result-detail"></p>
       <div class="progress-track mt-12">
         <div class="progress-fill" id="result-progress" style="width:0%"></div>
       </div>
       <div class="callout callout-primary mt-12" id="result-message"></div>
+    </div>
+
+    <div class="card mb-12">
+      <div class="card-label">교재별 실행률</div>
+      <div id="book-breakdown"></div>
     </div>
 
     <!-- 2단계: 이유 -->
@@ -97,7 +102,7 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
-let currentBook = null, weekGoal = 0, weekDone = 0, weekPct = 0;
+let activeBooks = [], bookResults = [], weekGoal = 0, weekDone = 0, weekPct = 0;
 let selectedReason = '', selectedNext = '';
 
 const REASON_MSG = {
@@ -116,17 +121,24 @@ const COACH_MSG = {
 };
 
 async function init() {
-  currentBook = await getActiveBook();
+  activeBooks = await getActiveBooks();
   document.getElementById('loading-msg').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
-  if (!currentBook) return;
+  if (!activeBooks.length) return;
 
   const weekDates = getThisWeekDates();
-  const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
-  weekGoal = plan ? plan.dailyPages.reduce((a,b)=>a+b,0) : 0;
-  for (const d of weekDates) {
-    const log = await getDailyLog(currentBook.id, d);
-    if (log) weekDone += (log.completedPages||0);
+  for (const book of activeBooks) {
+    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+    const goal = plan.dailyPages.reduce((a,b)=>a+b,0);
+    let done = 0;
+    for (const d of weekDates) {
+      const log = await getDailyLog(book.id, d);
+      if (log) done += (log.completedPages||0);
+    }
+    const pct = goal>0 ? Math.round(done/goal*100) : 0;
+    bookResults.push({ book, goal, done, pct, plan });
+    weekGoal += goal;
+    weekDone += done;
   }
   weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
 
@@ -138,10 +150,32 @@ async function init() {
     weekPct>=60 ? `${weekGoal-weekDone}쪽 못 했지만, 이유를 알면 다음 주엔 달라질 거야.` :
     '이번 주는 힘들었지? 괜찮아. 계획을 다시 짜면 돼.';
 
+  document.getElementById('book-breakdown').innerHTML = bookResults.map(r => `
+    <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div class="flex items-center justify-between mb-8">
+        <span class="text-sm font-semibold">[${r.book.subject}] ${r.book.title}</span>
+        <span class="text-sm font-bold ${r.pct >= 80 ? 'text-success' : r.pct >= 50 ? 'text-primary' : ''}">${r.pct}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${Math.min(100,r.pct)}%"></div>
+      </div>
+      <div class="progress-meta mt-4">
+        <span>${r.done} / ${r.goal}쪽</span>
+        <span>${r.pct < 60 ? '조정 필요' : '유지 가능'}</span>
+      </div>
+    </div>
+  `).join('');
+
   document.getElementById('reason-step').style.display = 'block';
 
-  const totalDone = await getTotalCompleted(currentBook.id);
-  if (totalDone >= currentBook.totalPages) document.getElementById('completion-cta').style.display = 'block';
+  for (const book of activeBooks) {
+    const totalDone = await getTotalCompleted(book.id);
+    if (totalDone >= book.totalPages) {
+      document.getElementById('completion-cta').style.display = 'block';
+      document.querySelector('#completion-cta a').href = `report.html?bookId=${book.id}`;
+      break;
+    }
+  }
 }
 
 function selectReason(el, val) {
@@ -168,16 +202,21 @@ async function submitReview() {
   btn.disabled = true; btn.textContent = '저장 중...';
   const weekDates = getThisWeekDates();
   try {
-    await db.collection('users').doc(USER_ID)
-      .collection('books').doc(currentBook.id)
+    await db.collection('users').doc(getUserId())
       .collection('weeklyReviews').doc(weekDates[0])
-      .set({ weekStart:weekDates[0], weekGoal, weekDone, weekPct, reason:selectedReason, nextPlan:selectedNext, savedAt:new Date().toISOString() });
+      .set({
+        weekStart:weekDates[0], weekGoal, weekDone, weekPct,
+        reason:selectedReason, nextPlan:selectedNext,
+        books:bookResults.map(r => ({ bookId:r.book.id, title:r.book.title, subject:r.book.subject, goal:r.goal, done:r.done, pct:r.pct })),
+        savedAt:new Date().toISOString()
+      });
     if (selectedNext === 'less') {
       const nextStart = (() => { const d=new Date(weekDates[0]); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
-      const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
-      if (plan) {
-        const np = plan.dailyPages.map(p=>p>0?Math.max(1,p-1):0);
-        await saveWeeklyPlan(currentBook.id, nextStart, { weekStart:nextStart, dailyPages:np, weekGoal:np.reduce((a,b)=>a+b,0), adjustedFrom:'review' });
+      for (const r of bookResults) {
+        if (r.pct < 80) {
+          const np = r.plan.dailyPages.map(p=>p>0?Math.max(1,p-1):0);
+          await saveWeeklyPlan(r.book.id, nextStart, { weekStart:nextStart, dailyPages:np, weekGoal:np.reduce((a,b)=>a+b,0), adjustedFrom:'review' });
+        }
       }
     }
     showToast('주간 점검 완료');
