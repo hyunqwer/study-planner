@@ -35,8 +35,8 @@ function normalizeCoachTone(text = '') {
 exports.analyzeToc = onRequest(
   {
     cors: true,
-    timeoutSeconds: 60,
-    memory: '256MiB',
+    timeoutSeconds: 120,
+    memory: '512MiB',
   },
   async (req, res) => {
 

@@ -129,7 +129,7 @@
         ondragover="event.preventDefault();this.classList.add('drag-over')"
         ondragleave="this.classList.remove('drag-over')"
         ondrop="handleDrop(event)">
-        <input type="file" accept="image/*,.heic,.heif" multiple id="file-input" onchange="handleFiles(this.files); this.value='';">
+        <input type="file" accept="image/*,image/heic,image/heif,.heic,.heif" multiple id="file-input" onchange="handleFiles(this.files); this.value='';">
         <div class="upload-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
@@ -353,10 +353,11 @@ let scannedChapters = [];
 const ANALYZE_URL = '/api/analyzeToc';
 const DIRECT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const PHONE_PHOTO_EXTENSIONS = /\.(jpe?g|png|webp|heic|heif)$/i;
-const MAX_IMAGE_DIMENSION = 1800;
-const MIN_IMAGE_DIMENSION = 1100;
-const TARGET_IMAGE_BYTES = 1400 * 1024;
-const MAX_TOTAL_BASE64_CHARS = 8 * 1024 * 1024;
+const MAX_UPLOAD_FILES = 3;
+const MAX_IMAGE_DIMENSION = 1600;
+const MIN_IMAGE_DIMENSION = 1000;
+const TARGET_IMAGE_BYTES = 850 * 1024;
+const MAX_TOTAL_BASE64_CHARS = 5 * 1024 * 1024;
 
 document.getElementById('scan-start-date').value = today();
 document.getElementById('r-start-page').addEventListener('input', updateScanPageInfo);
@@ -368,15 +369,19 @@ document.getElementById('scan-daily-pages').addEventListener('input', recalcScan
 // 파일 업로드
 // ────────────────────────────────────────
 function handleFiles(files) {
-  uploadedFiles = Array.from(files).filter(isSupportedPhotoFile);
+  const photoFiles = Array.from(files).filter(isSupportedPhotoFile);
+  uploadedFiles = photoFiles.slice(0, MAX_UPLOAD_FILES);
   if (!uploadedFiles.length) showToast('사진 파일을 선택해 주세요');
+  else if (photoFiles.length > MAX_UPLOAD_FILES) showToast(`목차 사진은 ${MAX_UPLOAD_FILES}장까지만 올릴게.`);
   renderPreviews();
 }
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('upload-zone').classList.remove('drag-over');
-  uploadedFiles = Array.from(e.dataTransfer.files).filter(isSupportedPhotoFile);
+  const photoFiles = Array.from(e.dataTransfer.files).filter(isSupportedPhotoFile);
+  uploadedFiles = photoFiles.slice(0, MAX_UPLOAD_FILES);
+  if (photoFiles.length > MAX_UPLOAD_FILES) showToast(`목차 사진은 ${MAX_UPLOAD_FILES}장까지만 올릴게.`);
   renderPreviews();
 }
 
@@ -388,21 +393,27 @@ function renderPreviews() {
     return;
   }
   uploadedFiles.forEach((f, i) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'position:relative;border-radius:var(--r);overflow:hidden;aspect-ratio:3/4;background:var(--surface-2)';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;border-radius:var(--r);overflow:hidden;aspect-ratio:3/4;background:var(--surface-2)';
+    const placeholder = `
+      <div style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:11px;color:var(--text-3)">미리보기 불가<br>분석 전 변환할게</div>
+    `;
+    if (isHeicFile(f)) {
+      wrap.innerHTML = placeholder;
+    } else {
+      const objectUrl = URL.createObjectURL(f);
       wrap.innerHTML = `
-        <img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <img src="${objectUrl}" style="width:100%;height:100%;object-fit:cover" onload="URL.revokeObjectURL(this.src)" onerror="URL.revokeObjectURL(this.src);this.style.display='none';this.nextElementSibling.style.display='flex'">
         <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:11px;color:var(--text-3)">미리보기 불가<br>분석 전 변환할게</div>
-        <button onclick="removeFile(${i})" style="position:absolute;top:4px;right:4px;
-          width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);
-          border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;
-          align-items:center;justify-content:center">✕</button>
       `;
-      grid.appendChild(wrap);
-    };
-    reader.readAsDataURL(f);
+    }
+    wrap.insertAdjacentHTML('beforeend', `
+      <button onclick="removeFile(${i})" style="position:absolute;top:4px;right:4px;
+        width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);
+        border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;
+        align-items:center;justify-content:center">✕</button>
+    `);
+    grid.appendChild(wrap);
   });
   document.getElementById('preview-list').style.display = 'block';
 }
@@ -455,6 +466,65 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
+function waitForNextFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+async function readImageSize(blob) {
+  try {
+    const buffer = await blob.slice(0, 2 * 1024 * 1024).arrayBuffer();
+    const view = new DataView(buffer);
+    const bytes = new Uint8Array(buffer);
+
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+      let offset = 2;
+      while (offset + 9 < bytes.length) {
+        if (bytes[offset] !== 0xff) {
+          offset++;
+          continue;
+        }
+        const marker = bytes[offset + 1];
+        const length = view.getUint16(offset + 2);
+        if (length < 2) break;
+        if (
+          marker === 0xc0 || marker === 0xc1 || marker === 0xc2 ||
+          marker === 0xc3 || marker === 0xc5 || marker === 0xc6 ||
+          marker === 0xc7 || marker === 0xc9 || marker === 0xca ||
+          marker === 0xcb || marker === 0xcd || marker === 0xce ||
+          marker === 0xcf
+        ) {
+          return {
+            width: view.getUint16(offset + 7),
+            height: view.getUint16(offset + 5),
+          };
+        }
+        offset += 2 + length;
+      }
+    }
+
+    if (
+      bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e &&
+      bytes[3] === 0x47 && bytes.length >= 24
+    ) {
+      return {
+        width: view.getUint32(16),
+        height: view.getUint32(20),
+      };
+    }
+  } catch {
+    // 크기를 미리 읽지 못해도 브라우저 디코딩으로 한 번 더 시도한다.
+  }
+  return null;
+}
+
+function fitWithin(width, height, maxDim) {
+  const scale = Math.min(1, maxDim / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
 function loadImageFromBlob(blob) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -471,9 +541,26 @@ function loadImageFromBlob(blob) {
   });
 }
 
+async function decodeImageBlob(blob, targetSize = null) {
+  if ('createImageBitmap' in window) {
+    try {
+      const options = { imageOrientation: 'from-image' };
+      if (targetSize) {
+        options.resizeWidth = targetSize.width;
+        options.resizeHeight = targetSize.height;
+        options.resizeQuality = 'high';
+      }
+      return await createImageBitmap(blob, options);
+    } catch {
+      // 일부 모바일 브라우저는 createImageBitmap 옵션을 지원하지 않아 img 태그 방식으로 한 번 더 시도한다.
+    }
+  }
+  return await loadImageFromBlob(blob);
+}
+
 async function convertHeicToJpegBlob(file) {
   if (!window.heic2any) {
-    throw new Error('폰 사진 변환 도구를 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+    throw new Error('HEIC 사진 변환 도구를 불러오지 못했어. 사진 앱에서 JPG로 공유하거나 스크린샷으로 다시 올려줘.');
   }
   try {
     const converted = await window.heic2any({
@@ -483,21 +570,27 @@ async function convertHeicToJpegBlob(file) {
     });
     return Array.isArray(converted) ? converted[0] : converted;
   } catch {
-    throw new Error('HEIC 사진을 변환하지 못했어요. 사진 앱에서 공유하거나 스크린샷으로 다시 올려 주세요.');
+    throw new Error('HEIC 사진을 변환하지 못했어. 사진 앱에서 JPG로 공유하거나 스크린샷으로 다시 올려줘.');
   }
 }
 
 async function compressImageBlob(blob) {
-  const img = await loadImageFromBlob(blob);
+  const originalSize = await readImageSize(blob);
+  const firstTarget = originalSize ? fitWithin(originalSize.width, originalSize.height, MAX_IMAGE_DIMENSION) : null;
+  const img = await decodeImageBlob(blob, firstTarget);
   let maxDim = MAX_IMAGE_DIMENSION;
   let quality = 0.84;
   let bestBlob = null;
   const sourceWidth = img.naturalWidth || img.width;
   const sourceHeight = img.naturalHeight || img.height;
+  if (!sourceWidth || !sourceHeight) {
+    throw new Error('사진 크기를 읽지 못했어. 다른 사진으로 다시 올려줘.');
+  }
   let bestWidth = sourceWidth;
   let bestHeight = sourceHeight;
 
   for (let attempt = 0; attempt < 8; attempt++) {
+    await waitForNextFrame();
     const scale = Math.min(1, maxDim / Math.max(sourceWidth, sourceHeight));
     const width = Math.max(1, Math.round(sourceWidth * scale));
     const height = Math.max(1, Math.round(sourceHeight * scale));
@@ -505,6 +598,7 @@ async function compressImageBlob(blob) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('사진 압축을 시작하지 못했어. 브라우저를 새로고침한 뒤 다시 시도해줘.');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
@@ -512,12 +606,16 @@ async function compressImageBlob(blob) {
     bestBlob = await canvasToBlob(canvas, 'image/jpeg', quality);
     bestWidth = width;
     bestHeight = height;
+    canvas.width = 1;
+    canvas.height = 1;
 
     if (bestBlob.size <= TARGET_IMAGE_BYTES) break;
     if (quality > 0.64) quality -= 0.08;
     else if (maxDim > MIN_IMAGE_DIMENSION) maxDim = Math.round(maxDim * 0.85);
     else break;
   }
+
+  if (img.close) img.close();
 
   return {
     base64: await blobToBase64(bestBlob),
@@ -535,9 +633,12 @@ async function fileToImagePayload(file) {
   }
 
   try {
-    const sourceBlob = isHeicFile(file) ? await convertHeicToJpegBlob(file) : file;
-    return await compressImageBlob(sourceBlob);
+    return await compressImageBlob(file);
   } catch (err) {
+    if (isHeicFile(file)) {
+      const convertedBlob = await convertHeicToJpegBlob(file);
+      return await compressImageBlob(convertedBlob);
+    }
     if (DIRECT_IMAGE_TYPES.includes(mimeType) && file.size <= TARGET_IMAGE_BYTES) {
       return { base64: await blobToBase64(file), mimeType, size: file.size };
     }
