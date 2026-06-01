@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>새 책 등록 — 작전노트</title>
+<title>새 교재 등록 — 작전노트</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,47 +12,55 @@
   <button class="nav-back" onclick="history.back()">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
-  <span class="nav-title">새 책 등록</span>
+  <span class="nav-title">새 교재 등록</span>
 </header>
 
 <main class="container">
 
-  <!-- 목차 스캔 배너 -->
-  <div id="scan-banner" class="card mb-16" style="border-color:var(--primary);background:var(--primary-glow);display:none">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="width:36px;height:36px;border-radius:var(--r);background:var(--primary-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-      <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:2px">목차 스캔 완료</div>
-        <div class="text-xs text-2" id="scan-banner-sub"></div>
+  <div id="method-section">
+    <h2 class="mb-8">새 교재를 어떻게 등록할까?</h2>
+    <p class="text-sm text-2 mb-16">직접 입력하거나, 목차 사진으로 단원 정보를 먼저 불러올 수 있어.</p>
+
+    <div class="card" style="cursor:pointer" onclick="startManual()">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="card-label" style="margin-bottom:4px">직접 입력</div>
+          <h3 class="mb-4">책 정보를 직접 넣기</h3>
+          <p class="text-sm text-2">책 이름, 페이지, 공부 요일을 차례로 입력해.</p>
+        </div>
+        <div class="list-item-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- 목차 스캔 CTA (스캔 결과 없을 때) -->
-  <div id="scan-cta" class="mb-16">
-    <a href="toc-scan.html" class="btn btn-ghost btn-md w-full" style="border:1px dashed var(--border-2);justify-content:flex-start;gap:10px">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      <span>
-        <span style="display:block;font-size:13px;font-weight:600">목차 사진으로 자동 입력</span>
-        <span class="text-xs text-3">AI가 단원·페이지 수를 자동으로 인식해줘</span>
-      </span>
+    <a href="toc-scan.html" class="card" style="display:block;text-decoration:none;color:inherit">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="card-label" style="margin-bottom:4px">목차 사진</div>
+          <h3 class="mb-4">목차를 찍어서 시작하기</h3>
+          <p class="text-sm text-2">단원 시작 페이지를 읽고, 부족한 정보만 확인해.</p>
+        </div>
+        <div class="list-item-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
     </a>
   </div>
 
-  <!-- 단계 표시 -->
-  <div class="steps">
-    <div class="step-dot active" id="dot1"></div>
-    <div class="step-line"></div>
-    <div class="step-dot" id="dot2"></div>
-    <div class="step-line"></div>
-    <div class="step-dot" id="dot3"></div>
-  </div>
+  <div id="manual-flow" style="display:none">
+    <!-- 단계 표시 -->
+    <div class="steps">
+      <div class="step-dot active" id="dot1"></div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-line"></div>
+      <div class="step-dot" id="dot3"></div>
+    </div>
 
-  <!-- STEP 1 -->
-  <div id="step1">
-    <h2 class="mb-16">어떤 책을 시작할 거야?</h2>
+    <!-- STEP 1 -->
+    <div id="step1">
+      <h2 class="mb-16">어떤 책을 시작할 거야?</h2>
 
     <div class="form-group">
       <label class="form-label">과목</label>
@@ -89,16 +97,17 @@
       </div>
       <div class="form-group">
         <label class="form-label">총 페이지 수</label>
-        <input class="form-input" type="number" id="total-pages-display" placeholder="자동 계산" readonly
+        <input class="form-input" type="text" id="total-pages-display" placeholder="자동 계산" readonly
           style="background:var(--surface-3);color:var(--text-2)">
       </div>
     </div>
 
-    <button class="btn btn-primary btn-lg mt-8" onclick="goStep2()">다음</button>
-  </div>
+      <button class="btn btn-primary btn-lg mt-8" onclick="goStep2()">다음</button>
+      <button class="btn btn-ghost btn-md w-full mt-8" onclick="backToMethod()">등록 방법 다시 선택</button>
+    </div>
 
-  <!-- STEP 2 -->
-  <div id="step2" style="display:none">
+    <!-- STEP 2 -->
+    <div id="step2" style="display:none">
     <h2 class="mb-4">공부 계획을 짜보자</h2>
     <p class="text-sm text-2 mb-16">요일이랑 하루 분량을 정하면 완료일이 자동으로 계산돼</p>
 
@@ -148,10 +157,10 @@
       <button class="btn btn-ghost btn-md flex-1" onclick="goStep1()">이전</button>
       <button class="btn btn-primary btn-md" style="flex:2" onclick="goStep3()">다음</button>
     </div>
-  </div>
+    </div>
 
-  <!-- STEP 3 -->
-  <div id="step3" style="display:none">
+    <!-- STEP 3 -->
+    <div id="step3" style="display:none">
     <h2 class="mb-16">마지막으로 2가지만!</h2>
 
     <div class="form-group">
@@ -170,6 +179,7 @@
       <button class="btn btn-ghost btn-md flex-1" onclick="goStep2()">이전</button>
       <button class="btn btn-success btn-md" style="flex:2" onclick="submitBook()" id="submit-btn">작전 시작</button>
     </div>
+    </div>
   </div>
 
 </main>
@@ -182,48 +192,26 @@
 <script>
 let selectedSubject = '';
 let selectedPlan = 'ok';
-let scannedChapters = [];
 
 document.getElementById('start-date').value = today();
 const twoMonths = new Date();
 twoMonths.setMonth(twoMonths.getMonth() + 2);
 document.getElementById('end-date').value = twoMonths.toISOString().slice(0, 10);
 
-// 목차 스캔 결과 자동 주입
-const scanResult = sessionStorage.getItem('toc_scan_result');
-if (scanResult) {
-  try {
-    const data = JSON.parse(scanResult);
-    sessionStorage.removeItem('toc_scan_result');
+function startManual() {
+  document.getElementById('method-section').style.display = 'none';
+  document.getElementById('manual-flow').style.display = 'block';
+  document.getElementById('step1').style.display = 'block';
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'none';
+  document.getElementById('dot1').className = 'step-dot active';
+  document.getElementById('dot2').className = 'step-dot';
+  document.getElementById('dot3').className = 'step-dot';
+}
 
-    // 폼 자동 채우기
-    if (data.bookTitle) document.getElementById('book-title').value = data.bookTitle;
-    if (data.totalPages) document.getElementById('total-pages').value = data.totalPages;
-    if (data.totalUnits) document.getElementById('total-units').value = data.totalUnits;
-    scannedChapters = data.chapters || [];
-
-    // 배너 표시
-    document.getElementById('scan-cta').style.display = 'none';
-    document.getElementById('scan-banner').style.display = 'block';
-    document.getElementById('scan-banner-sub').textContent =
-      `${data.chapters?.length || 0}단원 · 총 ${data.totalPages || '?'}쪽 자동 입력됨`;
-
-    // 단원 정보로 과목 힌트 (제목에서 추정)
-    const title = (data.bookTitle || '').toLowerCase();
-    const subjectGuess =
-      /수학|math/i.test(title) ? '수학' :
-      /영어|english/i.test(title) ? '영어' :
-      /국어/i.test(title) ? '국어' :
-      /과학|science/i.test(title) ? '과학' :
-      /사회/i.test(title) ? '사회' : null;
-    if (subjectGuess) {
-      document.querySelectorAll('#subject-chips .chip').forEach(c => {
-        if (c.textContent === subjectGuess) {
-          selectSubject(c, subjectGuess);
-        }
-      });
-    }
-  } catch(e) { console.error('스캔 결과 파싱 실패', e); }
+function backToMethod() {
+  document.getElementById('manual-flow').style.display = 'none';
+  document.getElementById('method-section').style.display = 'block';
 }
 
 function selectSubject(el, val) {
@@ -410,8 +398,8 @@ async function submitBook() {
       status: 'active',
       dailyPages: calc.dailyPages, weeklyPages: calc.weeklyPages,
       workDays: workDayNums, planFeedback: selectedPlan,
-      chapters: scannedChapters.length ? scannedChapters : [],
-      hasTocScan: scannedChapters.length > 0,
+      chapters: [],
+      hasTocScan: false,
     };
 
     const bookId = await saveBook(bookData);

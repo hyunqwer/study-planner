@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>목차 스캔 — 작전노트</title>
+<title>목차로 교재 등록 — 작전노트</title>
 <link rel="stylesheet" href="style.css">
 <style>
   /* ── 업로드 존 ── */
@@ -110,7 +110,7 @@
   <button class="nav-back" onclick="history.back()">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
-  <span class="nav-title">목차 스캔</span>
+  <span class="nav-title">목차로 교재 등록</span>
 </header>
 
 <main class="container">
@@ -123,7 +123,7 @@
     <!-- 1. 이미지 업로드 -->
     <div id="upload-step">
       <h2 class="mb-4">목차 사진을 올려줘</h2>
-      <p class="text-sm text-2 mb-16">책 목차 페이지를 찍은 사진이면 돼.<br>여러 장도 가능해.</p>
+      <p class="text-sm text-2 mb-16">책 목차 페이지를 찍은 사진이면 돼.<br>표지는 없어도 되고, 여러 장도 가능해.</p>
 
       <div class="upload-zone" id="upload-zone"
         ondragover="event.preventDefault();this.classList.add('drag-over')"
@@ -162,23 +162,57 @@
         목차 인식 완료
       </div>
 
+      <h2 class="mb-4">목차를 읽었어</h2>
+      <p class="text-sm text-2 mb-16">단원 시작 페이지는 확인하고, 마지막 페이지는 책을 보고 직접 넣어줘.</p>
+
+      <div class="callout callout-primary mb-12">
+        목차에는 보통 단원 시작 페이지만 있어. 각 단원의 끝 페이지는 다음 단원 시작 페이지와 마지막 페이지로 계산할게.
+      </div>
+
       <!-- 책 기본 정보 -->
       <div class="card mb-12">
-        <div class="card-label">인식된 책 정보</div>
+        <div class="card-label">교재 정보 확인</div>
         <div class="form-group">
           <label class="form-label">책 이름</label>
           <input class="form-input" type="text" id="r-title" placeholder="직접 수정 가능">
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">총 페이지</label>
-            <input class="form-input" type="number" id="r-total-pages" min="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">총 단원 수</label>
-            <input class="form-input" type="number" id="r-total-units" min="1">
+
+        <div class="form-group">
+          <label class="form-label">과목</label>
+          <div class="chip-group" id="scan-subject-chips">
+            <button class="chip" onclick="selectScanSubject(this,'수학')">수학</button>
+            <button class="chip" onclick="selectScanSubject(this,'영어')">영어</button>
+            <button class="chip" onclick="selectScanSubject(this,'국어')">국어</button>
+            <button class="chip" onclick="selectScanSubject(this,'과학')">과학</button>
+            <button class="chip" onclick="selectScanSubject(this,'사회')">사회</button>
+            <button class="chip" onclick="selectScanSubject(this,'기타')">기타</button>
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">시작 페이지</label>
+            <input class="form-input" type="number" id="r-start-page" min="1" value="1" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label">마지막 페이지</label>
+            <input class="form-input" type="number" id="r-last-page" min="1" placeholder="직접 확인" inputmode="numeric">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">총 단원 수</label>
+            <input class="form-input" type="number" id="r-total-units" min="1" readonly
+              style="background:var(--surface-3);color:var(--text-2)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">총 페이지 수</label>
+            <input class="form-input" type="text" id="r-total-pages-display" placeholder="자동 계산" readonly
+              style="background:var(--surface-3);color:var(--text-2)">
+          </div>
+        </div>
+        <p class="text-xs text-3" id="last-page-hint"></p>
       </div>
 
       <!-- 단원 목록 -->
@@ -205,12 +239,87 @@
         <div style="display:flex;gap:16px;font-size:11px;color:var(--text-3)" id="diff-legend"></div>
       </div>
 
-      <!-- 등록으로 이동 -->
-      <button class="btn btn-primary btn-lg" onclick="goToRegister()">
-        이 내용으로 책 등록하기
+      <button class="btn btn-primary btn-lg" onclick="goPlanStep()">
+        다음: 공부 계획 세우기
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
       <button class="btn btn-ghost btn-md w-full mt-8" onclick="resetScan()">다시 스캔하기</button>
+    </div>
+
+    <!-- 4. 공부 계획 -->
+    <div id="plan-step" style="display:none">
+      <h2 class="mb-4">공부 계획을 짜보자</h2>
+      <p class="text-sm text-2 mb-16">요일이랑 하루 분량을 정하면 완료일이 자동으로 계산돼.</p>
+
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">시작일</label>
+          <input class="form-input" type="date" id="scan-start-date">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">공부할 요일</label>
+          <div class="chip-group" id="scan-workday-chips">
+            <button class="chip selected" data-day="1" onclick="toggleScanDay(this)">월</button>
+            <button class="chip selected" data-day="2" onclick="toggleScanDay(this)">화</button>
+            <button class="chip" data-day="3" onclick="toggleScanDay(this)">수</button>
+            <button class="chip selected" data-day="4" onclick="toggleScanDay(this)">목</button>
+            <button class="chip selected" data-day="5" onclick="toggleScanDay(this)">금</button>
+            <button class="chip" data-day="6" onclick="toggleScanDay(this)">토</button>
+            <button class="chip" data-day="0" onclick="toggleScanDay(this)">일</button>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">하루 몇 쪽씩 할 거야?</label>
+          <div style="display:flex;align-items:center;gap:12px">
+            <input class="form-input" type="number" id="scan-daily-pages"
+              placeholder="예: 6" min="1" inputmode="numeric" style="max-width:100px;text-align:center;font-size:18px;font-weight:700">
+            <span class="text-sm text-2">쪽 / 일</span>
+          </div>
+          <div class="chip-group mt-8" id="scan-daily-quick">
+            <button class="chip" onclick="setScanDaily(3)">3쪽</button>
+            <button class="chip" onclick="setScanDaily(5)">5쪽</button>
+            <button class="chip" onclick="setScanDaily(8)">8쪽</button>
+            <button class="chip" onclick="setScanDaily(10)">10쪽</button>
+            <button class="chip" onclick="setScanDaily(15)">15쪽</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="scan-calc-result" style="display:none" class="mb-16">
+        <div class="callout callout-primary" id="scan-calc-text"></div>
+        <input type="hidden" id="scan-end-date">
+      </div>
+
+      <div class="flex gap-8">
+        <button class="btn btn-ghost btn-md flex-1" onclick="backToResult()">이전</button>
+        <button class="btn btn-primary btn-md" style="flex:2" onclick="goFinalStep()">다음</button>
+      </div>
+    </div>
+
+    <!-- 5. 마지막 확인 -->
+    <div id="final-step" style="display:none">
+      <h2 class="mb-16">마지막으로 2가지만!</h2>
+
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">이 책을 시작하는 이유</label>
+          <input class="form-input" type="text" id="scan-book-reason" placeholder="예: 분수와 비례가 약해서">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">끝내면 어떨 것 같아?</label>
+          <input class="form-input" type="text" id="scan-book-goal" placeholder="예: 수학이 덜 어렵게 느껴질 것 같다">
+        </div>
+      </div>
+
+      <div class="callout callout-success mb-16" id="scan-summary-text"></div>
+
+      <div class="flex gap-8">
+        <button class="btn btn-ghost btn-md flex-1" onclick="backToPlan()">이전</button>
+        <button class="btn btn-success btn-md" style="flex:2" onclick="submitScannedBook()" id="scan-submit-btn">작전 시작</button>
+      </div>
     </div>
 
     <!-- 오류 -->
@@ -225,16 +334,28 @@
 
 </main>
 
-<script src="firebase-config.js" onerror="console.log('firebase not needed here')"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
 <script>
 // ────────────────────────────────────────
 // 상태
 // ────────────────────────────────────────
 let uploadedFiles = [];
 let analysisResult = null;
+let selectedScanSubject = '';
+let scannedChapters = [];
 
 // Cloud Function 엔드포인트 (Hosting rewrite 경유)
 const ANALYZE_URL = '/api/analyzeToc';
+
+document.getElementById('scan-start-date').value = today();
+document.getElementById('r-start-page').addEventListener('input', updateScanPageInfo);
+document.getElementById('r-last-page').addEventListener('input', updateScanPageInfo);
+document.getElementById('scan-start-date').addEventListener('change', recalcScanPlan);
+document.getElementById('scan-daily-pages').addEventListener('input', recalcScanPlan);
 
 // ────────────────────────────────────────
 // 파일 업로드
@@ -372,48 +493,109 @@ async function startAnalysis() {
   }
 }
 
-// ────────────────────────────────────────
-// 결과 렌더링
-// ────────────────────────────────────────
-function showResult(data) {
-  showStep('result');
+function guessSubject(title) {
+  if (/수학|math/i.test(title)) return '수학';
+  if (/영어|english/i.test(title)) return '영어';
+  if (/국어/i.test(title)) return '국어';
+  if (/과학|science/i.test(title)) return '과학';
+  if (/사회/i.test(title)) return '사회';
+  return '';
+}
 
-  // 책 정보
-  document.getElementById('r-title').value = data.bookTitle || '';
-  const totalPagesFromChapters = data.chapters.length
-    ? Math.max(...data.chapters.map(c => c.endPage || 0))
-    : 0;
-  document.getElementById('r-total-pages').value = data.totalPages || totalPagesFromChapters || '';
-  document.getElementById('r-total-units').value = data.chapters.length || '';
+function selectScanSubject(el, val) {
+  document.querySelectorAll('#scan-subject-chips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedScanSubject = val;
+}
 
-  // 단원 목록
+function selectScanSubjectValue(val) {
+  if (!val) return;
+  document.querySelectorAll('#scan-subject-chips .chip').forEach(c => {
+    if (c.textContent === val) selectScanSubject(c, val);
+  });
+}
+
+function getStartPage() {
+  return parseInt(document.getElementById('r-start-page').value) || 1;
+}
+
+function getLastPage() {
+  return parseInt(document.getElementById('r-last-page').value) || 0;
+}
+
+function getScanTotalPages() {
+  const startPage = getStartPage();
+  const lastPage = getLastPage();
+  return lastPage >= startPage ? lastPage - startPage + 1 : 0;
+}
+
+function normalizeChapters(rawChapters) {
+  return (rawChapters || [])
+    .map((ch, i) => ({
+      number: ch.number || i + 1,
+      title: ch.title || `단원 ${i + 1}`,
+      startPage: parseInt(ch.startPage) || 0,
+      estimatedDifficulty: ch.estimatedDifficulty || 'medium',
+      estimatedDays: parseInt(ch.estimatedDays) || 3,
+    }))
+    .filter(ch => ch.title || ch.startPage)
+    .sort((a, b) => {
+      if (!a.startPage || !b.startPage) return 0;
+      return a.startPage - b.startPage;
+    });
+}
+
+function buildComputedChapters() {
+  const lastPage = getLastPage();
+  return scannedChapters.map((ch, i) => {
+    const nextStart = scannedChapters[i + 1]?.startPage || 0;
+    let endPage = 0;
+    if (ch.startPage && nextStart && nextStart > ch.startPage) endPage = nextStart - 1;
+    else if (ch.startPage && lastPage && lastPage >= ch.startPage) endPage = lastPage;
+    return { ...ch, endPage };
+  });
+}
+
+function updateScanPageInfo() {
+  const totalPages = getScanTotalPages();
+  document.getElementById('r-total-pages-display').value = totalPages ? totalPages + '쪽' : '';
+  renderChapterList();
+  recalcScanPlan();
+}
+
+function renderChapterList() {
+  const chapters = buildComputedChapters();
   const DIFF_COLOR = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
   const DIFF_KO = { easy: '쉬움', medium: '보통', hard: '어려움' };
 
-  document.getElementById('chapter-list').innerHTML = data.chapters.map((ch, i) => `
-    <div class="chapter-row">
-      <div class="chapter-num">${ch.number || i+1}</div>
-      <div class="chapter-body">
-        <div class="chapter-title">${ch.title}</div>
-        <div class="chapter-pages">
-          ${ch.startPage && ch.endPage ? `${ch.startPage}~${ch.endPage}쪽` : ''}
-          ${ch.estimatedDays ? ` · 약 ${ch.estimatedDays}일` : ''}
+  document.getElementById('chapter-list').innerHTML = chapters.map((ch, i) => {
+    const pageText = ch.startPage
+      ? ch.endPage
+        ? `${ch.startPage}~${ch.endPage}쪽`
+        : `${ch.startPage}쪽 시작`
+      : '시작 페이지 확인 필요';
+    return `
+      <div class="chapter-row">
+        <div class="chapter-num">${ch.number || i + 1}</div>
+        <div class="chapter-body">
+          <div class="chapter-title">${ch.title}</div>
+          <div class="chapter-pages">${pageText}${ch.estimatedDays ? ` · 약 ${ch.estimatedDays}일` : ''}</div>
         </div>
+        <div class="diff-dot ${DIFF_COLOR[ch.estimatedDifficulty] || 'diff-medium'}" title="${DIFF_KO[ch.estimatedDifficulty] || ''}"></div>
       </div>
-      <div class="diff-dot ${DIFF_COLOR[ch.estimatedDifficulty] || 'diff-medium'}" title="${DIFF_KO[ch.estimatedDifficulty]||''}"></div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+}
 
-  // 난이도 분포 바
-  const total = data.chapters.length;
-  const easyCount = data.chapters.filter(c => c.estimatedDifficulty === 'easy').length;
-  const mediumCount = data.chapters.filter(c => c.estimatedDifficulty === 'medium').length;
-  const hardCount = data.chapters.filter(c => c.estimatedDifficulty === 'hard').length;
-
+function renderDifficultySummary(data) {
+  const total = scannedChapters.length || 1;
+  const easyCount = scannedChapters.filter(c => c.estimatedDifficulty === 'easy').length;
+  const mediumCount = scannedChapters.filter(c => c.estimatedDifficulty === 'medium').length;
+  const hardCount = scannedChapters.filter(c => c.estimatedDifficulty === 'hard').length;
   const barParts = [
-    { pct: Math.round(easyCount/total*100), color: 'var(--success)', label: `쉬움 ${easyCount}` },
-    { pct: Math.round(mediumCount/total*100), color: 'var(--accent)', label: `보통 ${mediumCount}` },
-    { pct: Math.round(hardCount/total*100), color: 'var(--danger)', label: `어려움 ${hardCount}` },
+    { pct: Math.round(easyCount / total * 100), color: 'var(--success)', label: `쉬움 ${easyCount}` },
+    { pct: Math.round(mediumCount / total * 100), color: 'var(--accent)', label: `보통 ${mediumCount}` },
+    { pct: Math.round(hardCount / total * 100), color: 'var(--danger)', label: `어려움 ${hardCount}` },
   ].filter(p => p.pct > 0);
 
   document.getElementById('diff-bar').innerHTML = barParts.map(p =>
@@ -426,25 +608,120 @@ function showResult(data) {
     </span>`
   ).join('');
 
-  // AI 학습 제안
-  const totalEstDays = data.chapters.reduce((a, c) => a + (c.estimatedDays || 3), 0);
-  const hardChapters = data.chapters.filter(c => c.estimatedDifficulty === 'hard').map(c => c.title);
-
+  const totalEstDays = scannedChapters.reduce((a, c) => a + (c.estimatedDays || 3), 0);
+  const hardChapters = scannedChapters.filter(c => c.estimatedDifficulty === 'hard').map(c => c.title);
   let suggestion = data.aiComment ? `<p style="margin-bottom:10px">${data.aiComment}</p>` : '';
-  suggestion += `<p>전체 ${data.chapters.length}단원 기준으로 <strong>약 ${totalEstDays}일</strong> 예상돼.`;
+  suggestion += `<p>전체 ${scannedChapters.length}단원 기준으로 <strong>약 ${totalEstDays}일</strong> 예상돼.`;
   if (hardChapters.length) {
-    suggestion += ` <strong>${hardChapters.join(', ')}</strong> 단원은 어렵게 분류됐으니 시간을 더 넉넉하게 잡아봐.`;
+    suggestion += ` <strong>${hardChapters.join(', ')}</strong> 단원은 시간을 더 넉넉하게 잡아봐.`;
   }
   suggestion += `</p>`;
-
   document.getElementById('plan-suggestion').innerHTML = suggestion;
 }
 
-// ────────────────────────────────────────
-// 화면 전환
-// ────────────────────────────────────────
+function showResult(data) {
+  showStep('result');
+  const title = data.bookTitle || '';
+  scannedChapters = normalizeChapters(data.chapters || []);
+  document.getElementById('r-title').value = title;
+  document.getElementById('r-total-units').value = scannedChapters.length || '';
+  const firstStart = scannedChapters.find(ch => ch.startPage)?.startPage || 1;
+  document.getElementById('r-start-page').value = firstStart;
+  document.getElementById('r-last-page').value = '';
+  document.getElementById('last-page-hint').textContent =
+    data.totalPages ? `AI가 ${data.totalPages}쪽으로 추정했지만, 목차만으로는 틀릴 수 있어. 책의 마지막 페이지를 직접 확인해 줘.` : '마지막 페이지는 목차 사진만으로 정확히 알기 어려워.';
+  selectScanSubjectValue(guessSubject(title));
+  renderChapterList();
+  renderDifficultySummary(data);
+  updateScanPageInfo();
+}
+
+function getScanWorkDays() {
+  return Array.from(document.querySelectorAll('#scan-workday-chips .chip.selected'))
+    .map(c => parseInt(c.dataset.day));
+}
+
+function setScanDaily(n) {
+  document.getElementById('scan-daily-pages').value = n;
+  document.querySelectorAll('#scan-daily-quick .chip').forEach(c => {
+    c.classList.toggle('selected', parseInt(c.textContent) === n);
+  });
+  recalcScanPlan();
+}
+
+function toggleScanDay(el) {
+  el.classList.toggle('selected');
+  recalcScanPlan();
+}
+
+function calcScanEndDate(startDateStr, totalPages, dailyPages, workDayNums) {
+  if (!totalPages || !dailyPages || !workDayNums.length) return null;
+  const totalDays = Math.ceil(totalPages / dailyPages);
+  let date = new Date(startDateStr);
+  let studyDays = 0;
+  let safety = 0;
+  while (studyDays < totalDays && safety < 1000) {
+    date.setDate(date.getDate() + 1);
+    if (workDayNums.includes(date.getDay())) studyDays++;
+    safety++;
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function recalcScanPlan() {
+  const totalPages = getScanTotalPages();
+  const dailyPages = parseInt(document.getElementById('scan-daily-pages').value) || 0;
+  const startDate = document.getElementById('scan-start-date').value;
+  const workDayNums = getScanWorkDays();
+  if (!totalPages || !dailyPages || !startDate || !workDayNums.length) {
+    document.getElementById('scan-calc-result').style.display = 'none';
+    return;
+  }
+  const endDate = calcScanEndDate(startDate, totalPages, dailyPages, workDayNums);
+  if (!endDate) return;
+  document.getElementById('scan-end-date').value = endDate;
+  const totalStudyDays = Math.ceil(totalPages / dailyPages);
+  const weeks = Math.ceil(totalStudyDays / workDayNums.length);
+  const weeklyPages = dailyPages * workDayNums.length;
+  document.getElementById('scan-calc-result').style.display = 'block';
+  document.getElementById('scan-calc-text').innerHTML =
+    `총 <strong>${totalPages}쪽</strong> ÷ 하루 <strong>${dailyPages}쪽</strong><br>
+    주 ${workDayNums.length}일 기준 → 약 <strong>${weeks}주</strong> · 완료 예정 <strong>${formatDate(endDate)}</strong><br>
+    <span style="color:var(--text-3);font-size:12px">일주일 약 ${weeklyPages}쪽</span>`;
+}
+
+function goPlanStep() {
+  if (!document.getElementById('r-title').value.trim()) { showToast('책 이름을 확인해 주세요'); return; }
+  if (!selectedScanSubject) { showToast('과목을 선택해 주세요'); return; }
+  if (!getLastPage()) { showToast('마지막 페이지를 직접 입력해 주세요'); return; }
+  if (getScanTotalPages() <= 0) { showToast('시작 페이지와 마지막 페이지를 확인해 주세요'); return; }
+  showStep('plan');
+  recalcScanPlan();
+}
+
+function goFinalStep() {
+  const dailyPages = parseInt(document.getElementById('scan-daily-pages').value) || 0;
+  const workDayNums = getScanWorkDays();
+  if (!document.getElementById('scan-start-date').value) { showToast('시작일을 설정해 주세요'); return; }
+  if (!workDayNums.length) { showToast('공부할 요일을 1개 이상 선택해 주세요'); return; }
+  if (!dailyPages) { showToast('하루 분량을 입력해 주세요'); return; }
+  if (!document.getElementById('scan-end-date').value) { showToast('계획 계산을 먼저 확인해 주세요'); return; }
+
+  const start = document.getElementById('scan-start-date').value;
+  const end = document.getElementById('scan-end-date').value;
+  const weeks = Math.ceil(Math.ceil(getScanTotalPages() / dailyPages) / workDayNums.length);
+  document.getElementById('scan-summary-text').innerHTML =
+    `<strong>${document.getElementById('r-title').value}</strong><br>
+    ${getStartPage()}~${getLastPage()}쪽 · 총 ${getScanTotalPages()}쪽 · ${scannedChapters.length}단원<br>
+    ${formatDate(start)} — ${formatDate(end)} (${weeks}주) · 하루 약 ${dailyPages}쪽`;
+  showStep('final');
+}
+
+function backToResult() { showStep('result'); }
+function backToPlan() { showStep('plan'); }
+
 function showStep(step) {
-  ['upload-step', 'loading-step', 'result-step', 'error-step'].forEach(id => {
+  ['upload-step', 'loading-step', 'result-step', 'plan-step', 'final-step', 'error-step'].forEach(id => {
     document.getElementById(id).style.display = id === step + '-step' ? 'block' : 'none';
   });
 }
@@ -452,29 +729,86 @@ function showStep(step) {
 function resetScan() {
   uploadedFiles = [];
   analysisResult = null;
+  selectedScanSubject = '';
+  scannedChapters = [];
   document.getElementById('preview-grid').innerHTML = '';
   document.getElementById('preview-list').style.display = 'none';
+  document.getElementById('r-title').value = '';
+  document.getElementById('r-last-page').value = '';
+  document.getElementById('chapter-list').innerHTML = '';
+  document.querySelectorAll('#scan-subject-chips .chip').forEach(c => c.classList.remove('selected'));
   const fi = document.getElementById('file-input');
   if (fi) fi.value = '';
   showStep('upload');
 }
 
-// ────────────────────────────────────────
-// 등록 페이지로 데이터 전달
-// ────────────────────────────────────────
-function goToRegister() {
-  if (!analysisResult) return;
+async function submitScannedBook() {
+  const btn = document.getElementById('scan-submit-btn');
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('로그인 상태를 확인할 수 없어요. 다시 로그인해 주세요.');
+    USER_ID = user.uid;
 
-  const payload = {
-    bookTitle: document.getElementById('r-title').value,
-    totalPages: parseInt(document.getElementById('r-total-pages').value) || 0,
-    totalUnits: parseInt(document.getElementById('r-total-units').value) || 0,
-    chapters: analysisResult.chapters,
-  };
+    const startPage = getStartPage();
+    const lastPage = getLastPage();
+    const pages = getScanTotalPages();
+    const start = document.getElementById('scan-start-date').value;
+    const end = document.getElementById('scan-end-date').value;
+    const workDayNums = getScanWorkDays();
+    const dailyPages = parseInt(document.getElementById('scan-daily-pages').value) || 0;
 
-  sessionStorage.setItem('toc_scan_result', JSON.stringify(payload));
-  location.href = 'register.html?from=scan';
+    if (!selectedScanSubject) throw new Error('과목을 선택해 주세요.');
+    if (!document.getElementById('r-title').value.trim()) throw new Error('책 이름을 확인해 주세요.');
+    if (!lastPage || pages <= 0) throw new Error('시작·마지막 페이지를 확인해 주세요.');
+    if (!start || !end) throw new Error('시작일과 완료 예정일을 확인해 주세요.');
+    if (!workDayNums.length) throw new Error('공부할 요일을 1개 이상 선택해 주세요.');
+    if (!dailyPages) throw new Error('하루 분량을 1쪽 이상 입력해 주세요.');
+
+    const bookData = {
+      subject: selectedScanSubject,
+      title: document.getElementById('r-title').value.trim(),
+      startPage,
+      lastPage,
+      totalPages: pages,
+      totalUnits: scannedChapters.length,
+      startDate: start,
+      targetEndDate: end,
+      reason: document.getElementById('scan-book-reason').value.trim(),
+      goal: document.getElementById('scan-book-goal').value.trim(),
+      status: 'active',
+      dailyPages,
+      weeklyPages: dailyPages * workDayNums.length,
+      workDays: workDayNums,
+      planFeedback: 'ok',
+      chapters: buildComputedChapters(),
+      hasTocScan: true,
+    };
+
+    const bookId = await saveBook(bookData);
+    const weekDates = getThisWeekDates();
+    const dailyPagesArr = Array.from({ length: 7 }, (_, i) => {
+      const dow = new Date(weekDates[i]).getDay();
+      return workDayNums.includes(dow) ? dailyPages : 0;
+    });
+    await saveWeeklyPlan(bookId, weekDates[0], {
+      weekStart: weekDates[0],
+      dailyPages: dailyPagesArr,
+      weekGoal: dailyPagesArr.reduce((a, b) => a + b, 0),
+    });
+
+    showToast('작전 시작!');
+    setTimeout(() => location.href = 'index.html', 1000);
+  } catch(e) {
+    console.error(e);
+    showToast('저장 실패: ' + (e.message || e.code || '알 수 없는 오류'));
+    btn.disabled = false;
+    btn.textContent = '작전 시작';
+  }
 }
+
+requireAuth(() => {});
 </script>
 </body>
 </html>
