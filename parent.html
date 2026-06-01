@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부모 화면 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">부모 화면</span>
+</header>
+
+<main class="container">
+
+  <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+  <div id="main-content" style="display:none">
+
+    <!-- 한 줄 요약 -->
+    <div class="card" style="background:var(--surface-2)">
+      <div class="card-label">이번 주 요약</div>
+      <p style="font-size:15px;font-weight:600;line-height:1.6" id="one-liner"></p>
+    </div>
+
+    <!-- 통계 -->
+    <div class="card">
+      <div class="card-label">이번 주 결과</div>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="stat-num" id="p-week-pct">—</div><div class="stat-lbl">주간 달성률</div></div>
+        <div class="stat-cell"><div class="stat-num" id="p-week-done">0</div><div class="stat-lbl">완료 쪽수</div></div>
+        <div class="stat-cell"><div class="stat-num" id="p-total-pct">—</div><div class="stat-lbl">전체 진행률</div></div>
+        <div class="stat-cell"><div class="stat-num" id="p-days-left">—</div><div class="stat-lbl">남은 일수</div></div>
+      </div>
+    </div>
+
+    <!-- 아이 느낌 -->
+    <div class="card">
+      <div class="card-label">아이의 이번 주</div>
+      <div class="text-sm" style="line-height:1.8;color:var(--text-2)" id="child-feeling">아직 이번 주 점검이 없어요.</div>
+    </div>
+
+    <!-- 코칭 -->
+    <div class="card" style="border-color:var(--success);background:var(--success-dim)">
+      <div class="card-label" style="color:var(--success)">이번 주 코칭 포인트</div>
+      <div class="text-sm" style="line-height:1.8;color:var(--text-2)" id="coach-tip"></div>
+    </div>
+
+    <!-- 일일 기록 -->
+    <div class="card">
+      <div class="card-label">이번 주 일일 기록</div>
+      <table class="week-table">
+        <thead><tr><th>요일</th><th>계획</th><th>완료</th><th>난이도</th></tr></thead>
+        <tbody id="p-week-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- 부모 가이드 -->
+    <div class="card">
+      <div class="card-label">부모의 역할</div>
+      <div id="guide-rows">
+        <div class="info-row"><span class="info-row-label text-success">주 1회</span><span class="info-row-value text-sm">10분 작전회의</span></div>
+        <div class="info-row"><span class="info-row-label text-success">칭찬</span><span class="info-row-value text-sm">결과보다 과정과 조정 능력</span></div>
+        <div class="info-row"><span class="info-row-label" style="color:var(--danger)">자제</span><span class="info-row-value text-sm">매일 "했어? 안 했어?" 확인</span></div>
+        <div class="info-row"><span class="info-row-label" style="color:var(--danger)">자제</span><span class="info-row-value text-sm">계획 못 지켰을 때 혼내기</span></div>
+      </div>
+    </div>
+
+    <!-- 작전회의 스크립트 -->
+    <div class="card">
+      <div class="card-label">작전회의 스크립트</div>
+      <div id="script-rows"></div>
+    </div>
+
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const DIFF={'easy':'쉬움','medium':'적당','hard':'어려움','vhard':'매우 어려움'};
+const DAYS=['월','화','수','목','금','토','일'];
+
+const SCRIPT=[
+  ['먼저 묻기','&ldquo;이번 주 어땠어? 계획이 너무 많았어?&rdquo;'],
+  ['결과 보기','&ldquo;이번 주 N쪽 했네. 못 한 건 왜 그랬을 것 같아?&rdquo;'],
+  ['판단 없이 듣기','아이가 이유를 말하면 → &ldquo;그럼 계획이 조금 어려웠던 거네.&rdquo;'],
+  ['선택하게 하기','&ldquo;다음 주엔 어떻게 바꿀까? 분량 줄이기 vs 토요일 보충?&rdquo;'],
+  ['마무리 칭찬','&ldquo;계획을 고칠 줄 아는 게 진짜 실력이야.&rdquo;'],
+];
+
+async function init() {
+  const book = await getActiveBook();
+  document.getElementById('loading-msg').style.display='none';
+  document.getElementById('main-content').style.display='block';
+  if (!book) { document.getElementById('one-liner').textContent='진행 중인 책이 없어요.'; return; }
+
+  const weekDates = getThisWeekDates();
+  const plan = await getWeeklyPlan(book.id, weekDates[0]);
+  const weekGoal = plan ? plan.dailyPages.reduce((a,b)=>a+b,0) : 0;
+  const logs = {};
+  let weekDone = 0;
+  for (const d of weekDates) { logs[d]=await getDailyLog(book.id,d); if(logs[d]) weekDone+=(logs[d].completedPages||0); }
+  const weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
+  const totalDone = await getTotalCompleted(book.id);
+  const totalPct = Math.round(totalDone/book.totalPages*100);
+  const daysLeft = Math.max(0, diffDays(today(), book.targetEndDate));
+
+  document.getElementById('p-week-pct').textContent=weekPct+'%';
+  document.getElementById('p-week-done').textContent=weekDone;
+  document.getElementById('p-total-pct').textContent=totalPct+'%';
+  document.getElementById('p-days-left').textContent=daysLeft;
+
+  document.getElementById('one-liner').textContent =
+    weekPct>=90 ? `이번 주 [${book.title}] 목표의 ${weekPct}%를 완료했습니다. 아주 잘 하고 있어요.` :
+    weekPct>=60 ? `이번 주 ${weekGoal}쪽 중 ${weekDone}쪽 완료 (${weekPct}%). 무난하게 진행 중입니다.` :
+    `이번 주 달성률 ${weekPct}%. 조금 힘든 주였습니다. 이유를 함께 살펴보세요.`;
+
+  document.getElementById('coach-tip').innerHTML =
+    weekPct>=80 ? `아이에게: <em>"이번 주 계획을 잘 지켰어. 스스로 한 거야!"</em><br>지금은 개입보다 <strong>칭찬</strong>이 먼저입니다.` :
+    weekPct>=50 ? `아이에게: <em>"다 못 지킨 것보다, 왜 어려웠는지 알고 조정한 게 더 중요해."</em><br><strong>다음 주 계획 조정</strong>을 도와주세요.` :
+    `아이에게: <em>"이번 주는 힘들었지? 계획이 너무 많았던 건 아닐까?"</em><br>분량을 줄이거나 <strong>목표일을 조정</strong>하는 것도 전략입니다.`;
+
+  const rv = await db.collection('users').doc(USER_ID)
+    .collection('books').doc(book.id)
+    .collection('weeklyReviews').doc(weekDates[0]).get();
+  if (rv.exists) {
+    const d=rv.data();
+    const RK={'too-much':'계획이 너무 많았다','hard':'문제가 어려웠다','no-time':'시간이 부족했다',
+      'unfocused':'집중이 안 됐다','lazy':'하기 싫었다','schedule':'다른 일정이 많았다','unknown':'잘 모르겠다'};
+    document.getElementById('child-feeling').innerHTML=
+      `주간 점검 완료<br><strong>못 한 이유:</strong> ${RK[d.reason]||d.reason}<br><strong>다음 주 계획:</strong> ${d.nextPlan||'—'}`;
+  }
+
+  const tbody = document.getElementById('p-week-tbody');
+  weekDates.forEach((d,i)=>{
+    const log=logs[d], planned=plan?(plan.dailyPages[i]||0):0, done=log?log.completedPages:null;
+    tbody.innerHTML+=`<tr>
+      <td><strong>${DAYS[i]}</strong></td>
+      <td>${planned>0?planned+'쪽':'휴식'}</td>
+      <td>${done!==null?done+'쪽':'—'}</td>
+      <td><span class="text-sm text-2">${DIFF[log&&log.difficulty]||'—'}</span></td>
+    </tr>`;
+  });
+
+  document.getElementById('script-rows').innerHTML=SCRIPT.map(([k,v])=>`
+    <div class="info-row" style="align-items:flex-start">
+      <span class="info-row-label" style="white-space:nowrap;padding-top:2px">${k}</span>
+      <span class="info-row-value text-sm" style="text-align:right;color:var(--text-2)">${v}</span>
+    </div>
+  `).join('');
+}
+
+requireAuth(() => init());
+</script>
+</body>
+</html>

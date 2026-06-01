@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>완주 리포트 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">완주 리포트</span>
+</header>
+
+<main class="container">
+
+  <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+  <!-- 작성 폼 -->
+  <div id="form-section" style="display:none">
+
+    <div class="trophy-section">
+      <div class="trophy-icon-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+      </div>
+      <h2 class="mb-8">책 완주 축하해!</h2>
+      <p class="text-sm text-2">마지막으로 짧게 돌아보자</p>
+    </div>
+
+    <!-- 통계 -->
+    <div class="card">
+      <div class="card-label">이번 작전 기록</div>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="stat-num" id="stat-weeks">—</div><div class="stat-lbl">소요 기간</div></div>
+        <div class="stat-cell"><div class="stat-num" id="stat-pages">—</div><div class="stat-lbl">완료 쪽수</div></div>
+        <div class="stat-cell"><div class="stat-num" id="stat-rate">—</div><div class="stat-lbl">달성률</div></div>
+        <div class="stat-cell"><div class="stat-num" id="stat-days">—</div><div class="stat-lbl">공부한 날</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">끝낸 느낌은?</div>
+      <div class="chip-group" id="feel-chips">
+        <button class="chip" onclick="sel('feel-chips',this,'great')">정말 뿌듯해</button>
+        <button class="chip" onclick="sel('feel-chips',this,'ok')">그럭저럭</button>
+        <button class="chip" onclick="sel('feel-chips',this,'meh')">별로 실감 안 남</button>
+        <button class="chip" onclick="sel('feel-chips',this,'relief')">드디어 끝났다</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">가장 어려웠던 단원</div>
+      <input class="form-input" type="text" id="hard-unit" placeholder="예: 비례식과 비율">
+    </div>
+
+    <div class="card">
+      <div class="card-label">목표를 얼마나 달성했어?</div>
+      <div class="chip-group" id="goal-chips">
+        <button class="chip" onclick="sel('goal-chips',this,'full')">완전히 달성</button>
+        <button class="chip" onclick="sel('goal-chips',this,'most')">거의 달성</button>
+        <button class="chip" onclick="sel('goal-chips',this,'half')">반반</button>
+        <button class="chip" onclick="sel('goal-chips',this,'less')">조금 부족</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">한 줄 자기 평가</div>
+      <input class="form-input" type="text" id="self-eval" placeholder="예: 비례식이 처음보다 덜 헷갈린다">
+    </div>
+
+    <div class="card">
+      <div class="card-label">다음 책은?</div>
+      <div class="chip-group" id="next-chips">
+        <button class="chip" onclick="sel('next-chips',this,'harder')">더 어려운 책</button>
+        <button class="chip" onclick="sel('next-chips',this,'similar')">비슷한 난이도</button>
+        <button class="chip" onclick="sel('next-chips',this,'review')">복습 먼저</button>
+        <button class="chip" onclick="sel('next-chips',this,'rest')">좀 쉬고 싶어</button>
+      </div>
+    </div>
+
+    <button class="btn btn-accent btn-lg mt-8" onclick="submitReport()">완주 기록 남기기</button>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result-section" style="display:none">
+
+    <div class="trophy-section">
+      <div class="trophy-icon-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+      </div>
+      <h2 id="result-title" class="mb-4"></h2>
+      <p class="text-sm text-2" id="result-sub"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">완주 리포트</div>
+      <div id="report-rows"></div>
+    </div>
+
+    <div class="card" style="border-color:var(--success);background:var(--success-dim)">
+      <div class="card-label">부모님께</div>
+      <div class="text-sm" style="line-height:1.8;color:var(--text-2)" id="parent-summary"></div>
+    </div>
+
+    <div class="grid-2 mt-12">
+      <a href="register.html" class="btn btn-primary btn-md">다음 책 등록</a>
+      <a href="bookshelf.html" class="btn btn-outline btn-md">책장 보기</a>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let currentBook=null, totalDone=0, studyDays=0;
+const chips={};
+
+function sel(g,el,v) {
+  document.querySelectorAll(`#${g} .chip`).forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected'); chips[g]=v;
+}
+
+async function init() {
+  const bookId = getParam('bookId');
+  currentBook = bookId ? await getBook(bookId) : await getActiveBook();
+  document.getElementById('loading-msg').style.display='none';
+  if (!currentBook) { document.getElementById('form-section').style.display='block'; return; }
+
+  const ex = await db.collection('users').doc(USER_ID)
+    .collection('books').doc(currentBook.id)
+    .collection('reports').doc('completion').get();
+  if (ex.exists) { showResult(ex.data()); return; }
+
+  const snap = await db.collection('users').doc(USER_ID)
+    .collection('books').doc(currentBook.id)
+    .collection('dailyLogs').get();
+  const logs = snap.docs.map(d=>d.data());
+  totalDone = logs.reduce((a,l)=>a+(l.completedPages||0),0);
+  studyDays = logs.filter(l=>l.completedPages>0).length;
+  const weeks = Math.ceil(diffDays(currentBook.startDate, today())/7);
+  const rate = Math.round(totalDone/currentBook.totalPages*100);
+  document.getElementById('stat-weeks').textContent=weeks+'주';
+  document.getElementById('stat-pages').textContent=totalDone+'쪽';
+  document.getElementById('stat-rate').textContent=rate+'%';
+  document.getElementById('stat-days').textContent=studyDays+'일';
+  document.getElementById('form-section').style.display='block';
+}
+
+async function submitReport() {
+  const btn=document.querySelector('.btn-accent');
+  btn.disabled=true; btn.textContent='저장 중...';
+  const weeks=Math.ceil(diffDays(currentBook.startDate,today())/7);
+  const rate=Math.round(totalDone/currentBook.totalPages*100);
+  const data={
+    bookId:currentBook.id, title:currentBook.title, subject:currentBook.subject,
+    startDate:currentBook.startDate, completionDate:today(),
+    totalWeeks:weeks, totalPages:currentBook.totalPages, completedPages:totalDone,
+    studyDays, completionRate:rate,
+    hardUnit:document.getElementById('hard-unit').value.trim(),
+    selfEval:document.getElementById('self-eval').value.trim(),
+    feeling:chips['feel-chips']||'', goalAchieved:chips['goal-chips']||'', nextPlan:chips['next-chips']||'',
+    savedAt:new Date().toISOString(),
+  };
+  try {
+    await db.collection('users').doc(USER_ID)
+      .collection('books').doc(currentBook.id)
+      .collection('reports').doc('completion').set(data);
+    await updateBook(currentBook.id, { status:'completed', completedAt:today() });
+    showResult(data);
+  } catch(e) { console.error(e); showToast('저장 실패'); btn.disabled=false; btn.textContent='완주 기록 남기기'; }
+}
+
+const NEXT={harder:'더 어려운 심화서',similar:'비슷한 난이도',review:'복습 먼저',rest:'잠시 휴식'};
+
+function showResult(d) {
+  document.getElementById('form-section').style.display='none';
+  document.getElementById('result-section').style.display='block';
+  document.getElementById('result-title').textContent=d.title+' 완주';
+  document.getElementById('result-sub').textContent=`${formatDate(d.startDate)} — ${formatDate(d.completionDate)}`;
+  const rows=[
+    ['책 이름',d.title],['과목',d.subject],
+    ['시작일',formatDate(d.startDate)],['완료일',formatDate(d.completionDate)],
+    ['총 기간',d.totalWeeks+'주'],['완료 쪽수',d.completedPages+'쪽'],
+    ['달성률',d.completionRate+'%'],['공부한 날',d.studyDays+'일'],
+    ['어려운 단원',d.hardUnit||'—'],['한 줄 평가',d.selfEval||'—'],
+  ];
+  document.getElementById('report-rows').innerHTML=rows.map(([k,v])=>`
+    <div class="info-row"><span class="info-row-label">${k}</span><span class="info-row-value">${v}</span></div>
+  `).join('');
+  document.getElementById('parent-summary').innerHTML=
+    `이번 책은 총 <strong>${d.totalWeeks}주</strong> 동안 진행했고 <strong>${d.completedPages}쪽</strong>을 완료했습니다.<br>
+    계획 달성률은 <strong>${d.completionRate}%</strong>. ${d.hardUnit?`어려운 단원은 <strong>${d.hardUnit}</strong>.`:''}<br><br>
+    다음 방향: <strong>${NEXT[d.nextPlan]||'미정'}</strong>`;
+}
+
+requireAuth(() => init());
+</script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주간 작전표 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">주간 작전표</span>
+</header>
+
+<main class="container">
+
+  <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+  <div id="main-content" style="display:none">
+
+    <!-- 주간 요약 -->
+    <div class="card" style="background:var(--surface-2)">
+      <div class="flex items-center justify-between mb-12">
+        <div>
+          <div class="card-label" style="margin-bottom:4px">이번 주 목표</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.3px" id="week-goal-display"></div>
+        </div>
+        <div class="stat-cell" style="min-width:80px">
+          <div class="stat-num" style="font-size:20px" id="week-pct-label">—</div>
+          <div class="stat-lbl">달성률</div>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="week-progress" style="width:0%"></div>
+      </div>
+      <div class="progress-meta mt-4">
+        <span class="text-2 text-sm" id="week-period"></span>
+        <span class="text-sm" id="week-done-label"></span>
+      </div>
+    </div>
+
+    <!-- 요일별 테이블 -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-16">
+        <div class="card-label" style="margin-bottom:0">요일별 계획</div>
+        <button class="btn btn-ghost btn-sm" onclick="toggleEdit()" id="edit-btn">수정</button>
+      </div>
+
+      <table class="week-table" id="week-table">
+        <thead>
+          <tr>
+            <th>요일</th><th>계획</th><th>완료</th><th>상태</th>
+          </tr>
+        </thead>
+        <tbody id="week-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- 편집 모드 -->
+    <div id="edit-section" style="display:none">
+      <div class="card">
+        <div class="card-label">계획 수정 (0 = 휴식일)</div>
+        <div id="edit-inputs"></div>
+        <button class="btn btn-primary btn-lg mt-12" onclick="savePlan()">저장</button>
+      </div>
+    </div>
+
+    <!-- 작전 변경 제안 -->
+    <div class="card" id="catchup-card" style="display:none;border-color:var(--accent)">
+      <div class="card-label" style="color:var(--accent)">작전 수정 필요</div>
+      <p class="text-sm text-2 mb-12" id="catchup-msg"></p>
+      <div id="catchup-options"></div>
+    </div>
+
+    <!-- 철학 문구 -->
+    <div class="callout callout-primary mt-8">
+      계획은 틀려도 괜찮아. 중요한 건 <strong>다시 조정하는 것</strong>.
+    </div>
+
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <a href="index.html" data-page="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</a>
+  <a href="mission.html" data-page="mission"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션</a>
+  <a href="weekly.html" data-page="weekly" class="active"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표</a>
+  <a href="review.html" data-page="review"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검</a>
+  <a href="bookshelf.html" data-page="books"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장</a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const DAYS = ['월','화','수','목','금','토','일'];
+let currentBook = null, weekDates = [], weekStart = '';
+let currentPlan = null, dailyLogs = {}, isEditing = false;
+
+async function init() {
+  currentBook = await getActiveBook();
+  document.getElementById('loading-msg').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  if (!currentBook) { document.getElementById('week-goal-display').textContent = '진행 중인 책 없음'; return; }
+
+  weekDates = getThisWeekDates();
+  weekStart = weekDates[0];
+  currentPlan = await getWeeklyPlan(currentBook.id, weekStart);
+  if (!currentPlan) {
+    const workDays = currentBook.workDays || [1,2,4,5];
+    const dp = weekDates.map(d => workDays.includes(new Date(d).getDay()) ? (currentBook.dailyPages||5) : 0);
+    currentPlan = { weekStart, dailyPages: dp, weekGoal: dp.reduce((a,b)=>a+b,0) };
+    await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
+  }
+  for (const d of weekDates) dailyLogs[d] = await getDailyLog(currentBook.id, d);
+  renderTable(); renderSummary(); checkCatchup();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('week-tbody');
+  const todayStr = today();
+  tbody.innerHTML = '';
+  weekDates.forEach((d, i) => {
+    const log = dailyLogs[d];
+    const planned = currentPlan.dailyPages[i] || 0;
+    const done = log ? (log.completedPages || 0) : null;
+    const isToday = d === todayStr;
+    let status = '';
+    if (planned === 0) status = '<span class="badge badge-muted">휴식</span>';
+    else if (log && log.status === 'done') status = '<span class="badge badge-success">완료</span>';
+    else if (log && log.status === 'partial') status = '<span class="badge badge-accent">일부</span>';
+    else if (log && log.status === 'skip') status = '<span class="badge badge-muted">미완</span>';
+    else if (isToday) status = '<span class="badge badge-primary">오늘</span>';
+    else status = '<span class="text-3 text-xs">—</span>';
+    const tr = document.createElement('tr');
+    if (isToday) tr.classList.add('today');
+    if (log && log.status === 'done') tr.classList.add('done');
+    tr.innerHTML = `<td><strong>${DAYS[i]}</strong></td><td>${planned>0?planned+'쪽':'—'}</td><td>${done!==null?done+'쪽':'—'}</td><td>${status}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSummary() {
+  const goal = currentPlan.dailyPages.reduce((a,b)=>a+b,0);
+  let done = 0;
+  weekDates.forEach(d => { if (dailyLogs[d]) done += (dailyLogs[d].completedPages||0); });
+  const pct = goal>0 ? Math.round(done/goal*100) : 0;
+  document.getElementById('week-goal-display').textContent = goal + '쪽';
+  document.getElementById('week-period').textContent = `${formatDate(weekStart)} — ${formatDate(weekDates[6])}`;
+  document.getElementById('week-progress').style.width = pct + '%';
+  document.getElementById('week-done-label').textContent = `${done}쪽 완료`;
+  document.getElementById('week-pct-label').textContent = pct + '%';
+}
+
+async function checkCatchup() {
+  const totalDone = await getTotalCompleted(currentBook.id);
+  const elapsed = diffDays(currentBook.startDate, today());
+  const totalDays = diffDays(currentBook.startDate, currentBook.targetEndDate);
+  const expected = Math.floor(currentBook.totalPages * elapsed / totalDays);
+  const behind = expected - totalDone;
+  if (behind > 10) {
+    document.getElementById('catchup-card').style.display = 'block';
+    document.getElementById('catchup-msg').textContent = `현재 계획보다 약 ${behind}쪽 밀려 있어. 어떻게 할까?`;
+    const opts = calcCatchupOptions(currentBook, totalDone);
+    document.getElementById('catchup-options').innerHTML = opts.map(o => `
+      <button class="btn btn-ghost btn-md w-full mb-8" onclick="applyCatchup('${o.id}')">
+        <span>${o.label}</span><span class="text-2 text-sm">${o.detail}</span>
+      </button>
+    `).join('');
+  }
+}
+
+async function applyCatchup(id) {
+  if (id === 'A') {
+    const done = await getTotalCompleted(currentBook.id);
+    const daily = Math.ceil((currentBook.totalPages-done)/Math.max(1,diffDays(today(),currentBook.targetEndDate)));
+    currentPlan.dailyPages = currentPlan.dailyPages.map(p => p>0?daily:0);
+    currentPlan.weekGoal = currentPlan.dailyPages.reduce((a,b)=>a+b,0);
+    await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
+    showToast('작전 변경 완료');
+    renderTable(); renderSummary();
+    document.getElementById('catchup-card').style.display = 'none';
+  } else if (id === 'C') {
+    const nd = new Date(currentBook.targetEndDate);
+    nd.setDate(nd.getDate()+7);
+    await updateBook(currentBook.id, { targetEndDate: nd.toISOString().slice(0,10) });
+    showToast('목표일을 1주 연장했어');
+    document.getElementById('catchup-card').style.display = 'none';
+  } else { if (!isEditing) toggleEdit(); }
+}
+
+function toggleEdit() {
+  isEditing = !isEditing;
+  document.getElementById('edit-section').style.display = isEditing ? 'block' : 'none';
+  document.getElementById('edit-btn').textContent = isEditing ? '취소' : '수정';
+  if (isEditing) {
+    document.getElementById('edit-inputs').innerHTML = weekDates.map((d, i) => `
+      <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <span class="text-sm font-semibold">${DAYS[i]}요일</span>
+        <div class="flex items-center gap-8">
+          <input class="form-input" type="number" min="0" id="edit-day-${i}"
+            value="${currentPlan.dailyPages[i]||0}" style="width:72px;text-align:center">
+          <span class="text-sm text-3">쪽</span>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+async function savePlan() {
+  const np = weekDates.map((_,i) => parseInt(document.getElementById(`edit-day-${i}`).value)||0);
+  currentPlan.dailyPages = np; currentPlan.weekGoal = np.reduce((a,b)=>a+b,0);
+  await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
+  showToast('저장 완료');
+  isEditing = false;
+  document.getElementById('edit-section').style.display = 'none';
+  document.getElementById('edit-btn').textContent = '수정';
+  renderTable(); renderSummary();
+}
+
+requireAuth(() => init());
+setActiveNav('weekly');
+</script>
+</body>
+</html>

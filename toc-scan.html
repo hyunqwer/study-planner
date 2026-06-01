@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>목차 스캔 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* ── 업로드 존 ── */
+  .upload-zone {
+    border: 2px dashed var(--border-2);
+    border-radius: var(--r-xl);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--primary);
+    background: var(--primary-glow);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-zone .upload-icon {
+    width: 52px; height: 52px;
+    border-radius: var(--r-lg);
+    background: var(--surface-3);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .upload-zone .upload-icon svg { color: var(--text-3); }
+
+  /* ── 미리보기 ── */
+  .preview-img {
+    width: 100%; max-height: 280px;
+    object-fit: contain;
+    border-radius: var(--r);
+    background: var(--surface-2);
+    display: block;
+  }
+
+  /* ── 로딩 스피너 ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2.5px solid var(--border-2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+
+  /* ── 단원 카드 리스트 ── */
+  .chapter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .chapter-row:last-child { border-bottom: none; }
+  .chapter-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .chapter-body { flex: 1; min-width: 0; }
+  .chapter-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .chapter-pages { font-size: 11px; color: var(--text-3); }
+  .diff-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .diff-easy   { background: var(--success); }
+  .diff-medium { background: var(--accent); }
+  .diff-hard   { background: var(--danger); }
+
+  /* ── API 키 입력 ── */
+  .apikey-row {
+    display: flex; gap: 8px;
+  }
+  .apikey-row input { flex: 1; }
+
+  /* ── 단계 상태 ── */
+  .step-status {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border-radius: var(--r);
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .step-status.done { color: var(--success); }
+  .step-status.active { color: var(--text); }
+  .step-status.pending { color: var(--text-3); }
+</style>
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">목차 스캔</span>
+</header>
+
+<main class="container">
+
+  <!-- API 키 섹션 제거됨 (서버에서 처리) -->
+
+  <!-- 메인 스캔 UI -->
+  <div id="scan-section">
+
+    <!-- 1. 이미지 업로드 -->
+    <div id="upload-step">
+      <h2 class="mb-4">목차 사진을 올려줘</h2>
+      <p class="text-sm text-2 mb-16">책 목차 페이지를 찍은 사진이면 돼.<br>여러 장도 가능해.</p>
+
+      <div class="upload-zone" id="upload-zone"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDrop(event)">
+        <input type="file" accept="image/*" multiple id="file-input" onchange="handleFiles(this.files); this.value='';">
+        <div class="upload-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <p style="font-size:14px;font-weight:600;margin-bottom:4px">사진 업로드</p>
+        <p class="text-sm text-3">탭하거나 파일을 드래그해서 올려줘</p>
+      </div>
+
+      <!-- 미리보기 -->
+      <div id="preview-list" style="display:none;margin-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px" id="preview-grid"></div>
+        <button class="btn btn-primary btn-lg" onclick="startAnalysis()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          AI로 분석하기
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. 분석 중 -->
+    <div id="loading-step" style="display:none;text-align:center;padding:48px 0">
+      <div class="spinner" style="margin:0 auto 20px"></div>
+      <h3 class="mb-8" id="loading-msg">목차를 읽고 있어...</h3>
+      <p class="text-sm text-2" id="loading-sub">GPT-4o Vision이 단원 구조를 파악 중</p>
+    </div>
+
+    <!-- 3. 결과 -->
+    <div id="result-step" style="display:none">
+
+      <div class="step-status done mb-12">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        목차 인식 완료
+      </div>
+
+      <!-- 책 기본 정보 -->
+      <div class="card mb-12">
+        <div class="card-label">인식된 책 정보</div>
+        <div class="form-group">
+          <label class="form-label">책 이름</label>
+          <input class="form-input" type="text" id="r-title" placeholder="직접 수정 가능">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">총 페이지</label>
+            <input class="form-input" type="number" id="r-total-pages" min="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">총 단원 수</label>
+            <input class="form-input" type="number" id="r-total-units" min="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- 단원 목록 -->
+      <div class="card mb-12">
+        <div class="card-label">인식된 단원 목록</div>
+        <div style="display:flex;gap:12px;margin-bottom:12px;font-size:11px;color:var(--text-3)">
+          <span style="display:flex;align-items:center;gap:4px"><span class="diff-dot diff-easy"></span>쉬움</span>
+          <span style="display:flex;align-items:center;gap:4px"><span class="diff-dot diff-medium"></span>보통</span>
+          <span style="display:flex;align-items:center;gap:4px"><span class="diff-dot diff-hard"></span>어려움</span>
+        </div>
+        <div id="chapter-list"></div>
+      </div>
+
+      <!-- AI 학습 계획 제안 -->
+      <div class="card mb-12" style="border-color:var(--accent);background:var(--accent-dim)">
+        <div class="card-label" style="color:var(--accent)">AI 학습 계획 제안</div>
+        <div id="plan-suggestion" style="font-size:13px;line-height:1.8;color:var(--text-2)"></div>
+      </div>
+
+      <!-- 난이도 분포 -->
+      <div class="card mb-16">
+        <div class="card-label">단원별 난이도 분포</div>
+        <div id="diff-bar" style="display:flex;height:8px;border-radius:99px;overflow:hidden;margin-bottom:8px"></div>
+        <div style="display:flex;gap:16px;font-size:11px;color:var(--text-3)" id="diff-legend"></div>
+      </div>
+
+      <!-- 등록으로 이동 -->
+      <button class="btn btn-primary btn-lg" onclick="goToRegister()">
+        이 내용으로 책 등록하기
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-md w-full mt-8" onclick="resetScan()">다시 스캔하기</button>
+    </div>
+
+    <!-- 오류 -->
+    <div id="error-step" style="display:none;text-align:center;padding:32px 0">
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 14px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <h3 class="mb-8">인식에 실패했어</h3>
+      <p class="text-sm text-2 mb-16" id="error-msg"></p>
+      <button class="btn btn-ghost btn-md" onclick="resetScan()">다시 시도하기</button>
+    </div>
+
+  </div>
+
+</main>
+
+<script src="firebase-config.js" onerror="console.log('firebase not needed here')"></script>
+<script>
+// ────────────────────────────────────────
+// 상태
+// ────────────────────────────────────────
+let uploadedFiles = [];
+let analysisResult = null;
+
+// Cloud Function 엔드포인트 (Hosting rewrite 경유)
+const ANALYZE_URL = '/api/analyzeToc';
+
+// ────────────────────────────────────────
+// 파일 업로드
+// ────────────────────────────────────────
+function handleFiles(files) {
+  uploadedFiles = Array.from(files);
+  renderPreviews();
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  uploadedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  renderPreviews();
+}
+
+function renderPreviews() {
+  if (!uploadedFiles.length) return;
+  const grid = document.getElementById('preview-grid');
+  grid.innerHTML = '';
+  uploadedFiles.forEach((f, i) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;border-radius:var(--r);overflow:hidden;aspect-ratio:3/4;background:var(--surface-2)';
+      wrap.innerHTML = `
+        <img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">
+        <button onclick="removeFile(${i})" style="position:absolute;top:4px;right:4px;
+          width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);
+          border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;
+          align-items:center;justify-content:center">✕</button>
+      `;
+      grid.appendChild(wrap);
+    };
+    reader.readAsDataURL(f);
+  });
+  document.getElementById('preview-list').style.display = 'block';
+}
+
+function removeFile(idx) {
+  uploadedFiles.splice(idx, 1);
+  if (!uploadedFiles.length) {
+    document.getElementById('preview-list').style.display = 'none';
+  } else renderPreviews();
+}
+
+// ────────────────────────────────────────
+// 이미지 → 리사이즈 후 base64 (최대 1200px)
+// ────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(dataUrl.split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+// ────────────────────────────────────────
+// Cloud Function 호출로 분석
+// ────────────────────────────────────────
+async function startAnalysis() {
+  if (!uploadedFiles.length) return;
+
+  showStep('loading');
+  document.getElementById('loading-msg').textContent = '목차를 읽고 있어...';
+  document.getElementById('loading-sub').textContent = 'GPT-4o Vision이 단원 구조를 파악 중';
+
+  try {
+    // 이미지 → base64 변환 (canvas 리사이즈 후 항상 JPEG)
+    const images = await Promise.all(uploadedFiles.map(f => fileToBase64(f)));
+    const mimeTypes = images.map(() => 'image/jpeg');
+
+    document.getElementById('loading-msg').textContent = 'AI가 분석 중...';
+
+    // Firebase Cloud Function 호출 (API 키는 서버에서 처리)
+    let response;
+    try {
+      response = await fetch(ANALYZE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images, mimeTypes }),
+      });
+    } catch(networkErr) {
+      throw new Error(`네트워크 오류: 서버에 연결할 수 없어요. (${networkErr.message})\n\n혹시 로컬에서 실행 중이라면 firebase serve 또는 배포 후 사용해줘.`);
+    }
+
+    // 서버 응답 텍스트 먼저 읽기 (JSON 파싱 실패해도 내용 확인 가능)
+    const rawText = await response.text();
+
+    if (!response.ok) {
+      let errMsg = `HTTP ${response.status}`;
+      try {
+        const errJson = JSON.parse(rawText);
+        errMsg += ` — ${errJson.error || JSON.stringify(errJson)}`;
+      } catch {
+        errMsg += ` — ${rawText.slice(0, 200)}`;
+      }
+      // 상태 코드별 힌트
+      if (response.status === 401) errMsg += '\n→ OpenAI API 키가 잘못됐어. functions/.env 확인 후 재배포 필요.';
+      if (response.status === 404) errMsg += '\n→ Cloud Function이 배포되지 않았어. firebase deploy --only functions 실행 필요.';
+      if (response.status === 429) errMsg += '\n→ OpenAI API 사용 한도 초과.';
+      if (response.status === 500) errMsg += '\n→ 서버 내부 오류. Firebase 콘솔 Functions 로그 확인 필요.';
+      throw new Error(errMsg);
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new Error(`AI 응답 파싱 실패.\n응답 내용: ${rawText.slice(0, 300)}`);
+    }
+
+    analysisResult = parsed;
+    showResult(parsed);
+
+  } catch(e) {
+    console.error(e);
+    showStep('error');
+    document.getElementById('error-msg').textContent = e.message || '알 수 없는 오류가 발생했어요.';
+  }
+}
+
+// ────────────────────────────────────────
+// 결과 렌더링
+// ────────────────────────────────────────
+function showResult(data) {
+  showStep('result');
+
+  // 책 정보
+  document.getElementById('r-title').value = data.bookTitle || '';
+  const totalPagesFromChapters = data.chapters.length
+    ? Math.max(...data.chapters.map(c => c.endPage || 0))
+    : 0;
+  document.getElementById('r-total-pages').value = data.totalPages || totalPagesFromChapters || '';
+  document.getElementById('r-total-units').value = data.chapters.length || '';
+
+  // 단원 목록
+  const DIFF_COLOR = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
+  const DIFF_KO = { easy: '쉬움', medium: '보통', hard: '어려움' };
+
+  document.getElementById('chapter-list').innerHTML = data.chapters.map((ch, i) => `
+    <div class="chapter-row">
+      <div class="chapter-num">${ch.number || i+1}</div>
+      <div class="chapter-body">
+        <div class="chapter-title">${ch.title}</div>
+        <div class="chapter-pages">
+          ${ch.startPage && ch.endPage ? `${ch.startPage}~${ch.endPage}쪽` : ''}
+          ${ch.estimatedDays ? ` · 약 ${ch.estimatedDays}일` : ''}
+        </div>
+      </div>
+      <div class="diff-dot ${DIFF_COLOR[ch.estimatedDifficulty] || 'diff-medium'}" title="${DIFF_KO[ch.estimatedDifficulty]||''}"></div>
+    </div>
+  `).join('');
+
+  // 난이도 분포 바
+  const total = data.chapters.length;
+  const easyCount = data.chapters.filter(c => c.estimatedDifficulty === 'easy').length;
+  const mediumCount = data.chapters.filter(c => c.estimatedDifficulty === 'medium').length;
+  const hardCount = data.chapters.filter(c => c.estimatedDifficulty === 'hard').length;
+
+  const barParts = [
+    { pct: Math.round(easyCount/total*100), color: 'var(--success)', label: `쉬움 ${easyCount}` },
+    { pct: Math.round(mediumCount/total*100), color: 'var(--accent)', label: `보통 ${mediumCount}` },
+    { pct: Math.round(hardCount/total*100), color: 'var(--danger)', label: `어려움 ${hardCount}` },
+  ].filter(p => p.pct > 0);
+
+  document.getElementById('diff-bar').innerHTML = barParts.map(p =>
+    `<div style="flex:${p.pct};background:${p.color}"></div>`
+  ).join('');
+  document.getElementById('diff-legend').innerHTML = barParts.map(p =>
+    `<span style="display:flex;align-items:center;gap:4px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${p.color};display:inline-block"></span>
+      ${p.label}단원
+    </span>`
+  ).join('');
+
+  // AI 학습 제안
+  const totalEstDays = data.chapters.reduce((a, c) => a + (c.estimatedDays || 3), 0);
+  const hardChapters = data.chapters.filter(c => c.estimatedDifficulty === 'hard').map(c => c.title);
+
+  let suggestion = data.aiComment ? `<p style="margin-bottom:10px">${data.aiComment}</p>` : '';
+  suggestion += `<p>전체 ${data.chapters.length}단원 기준으로 <strong>약 ${totalEstDays}일</strong> 예상돼.`;
+  if (hardChapters.length) {
+    suggestion += ` <strong>${hardChapters.join(', ')}</strong> 단원은 어렵게 분류됐으니 시간을 더 넉넉하게 잡아봐.`;
+  }
+  suggestion += `</p>`;
+
+  document.getElementById('plan-suggestion').innerHTML = suggestion;
+}
+
+// ────────────────────────────────────────
+// 화면 전환
+// ────────────────────────────────────────
+function showStep(step) {
+  ['upload-step', 'loading-step', 'result-step', 'error-step'].forEach(id => {
+    document.getElementById(id).style.display = id === step + '-step' ? 'block' : 'none';
+  });
+}
+
+function resetScan() {
+  uploadedFiles = [];
+  analysisResult = null;
+  document.getElementById('preview-grid').innerHTML = '';
+  document.getElementById('preview-list').style.display = 'none';
+  const fi = document.getElementById('file-input');
+  if (fi) fi.value = '';
+  showStep('upload');
+}
+
+// ────────────────────────────────────────
+// 등록 페이지로 데이터 전달
+// ────────────────────────────────────────
+function goToRegister() {
+  if (!analysisResult) return;
+
+  const payload = {
+    bookTitle: document.getElementById('r-title').value,
+    totalPages: parseInt(document.getElementById('r-total-pages').value) || 0,
+    totalUnits: parseInt(document.getElementById('r-total-units').value) || 0,
+    chapters: analysisResult.chapters,
+  };
+
+  sessionStorage.setItem('toc_scan_result', JSON.stringify(payload));
+  location.href = 'register.html?from=scan';
+}
+</script>
+</body>
+</html>

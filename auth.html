@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; padding-bottom:24px; }
+  .auth-wrap { width:100%; max-width:380px; }
+  .auth-logo { text-align:center; margin-bottom:36px; }
+  .auth-logo .logo-text { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+  .auth-logo .logo-text span { color:var(--primary); }
+  .auth-logo p { font-size:13px; color:var(--text-3); margin-top:6px; }
+  .tab-row { display:flex; background:var(--surface-2); border-radius:var(--r); padding:4px; margin-bottom:24px; }
+  .tab-btn { flex:1; padding:9px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; background:transparent; color:var(--text-3); font-family:inherit; transition:all .15s; }
+  .tab-btn.active { background:var(--surface-3); color:var(--text); }
+  .error-msg { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#fca5a5; border-radius:var(--r); padding:10px 14px; font-size:13px; margin-bottom:12px; display:none; }
+</style>
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-logo">
+    <div class="logo-text">작전<span>노트</span></div>
+    <p>나만의 공부 작전을 시작해봐</p>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">로그인</button>
+    <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">회원가입</button>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div id="login-form">
+    <div class="form-group">
+      <label class="form-label">이메일</label>
+      <input class="form-input" type="email" id="login-email" placeholder="example@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">비밀번호</label>
+      <input class="form-input" type="password" id="login-pw" placeholder="비밀번호 입력" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-lg mt-8" id="login-btn" onclick="login()">로그인</button>
+  </div>
+
+  <div id="signup-form" style="display:none">
+    <div class="form-group">
+      <label class="form-label">이메일</label>
+      <input class="form-input" type="email" id="signup-email" placeholder="example@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">비밀번호 <span class="text-3">(6자 이상)</span></label>
+      <input class="form-input" type="password" id="signup-pw" placeholder="비밀번호 설정" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">비밀번호 확인</label>
+      <input class="form-input" type="password" id="signup-pw2" placeholder="비밀번호 재입력" autocomplete="new-password">
+    </div>
+    <button class="btn btn-success btn-lg mt-8" id="signup-btn" onclick="signup()">가입하기</button>
+  </div>
+
+  <p class="text-xs text-3" style="text-align:center;margin-top:20px">
+    로그인 정보는 이 기기에 저장돼 다음엔 자동으로 로그인돼
+  </p>
+</div>
+
+<!-- Firebase SDK (Auth만 필요) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+// auth.html 전용 Firebase 초기화 (firebase-config.js 미사용 — 독립적으로 동작)
+const _firebaseConfig = {
+  apiKey: "AIzaSyB8F6DcDxaJ0lt5znwL0BNlPkZXr8OZCSk",
+  authDomain: "selfstudy-planner.firebaseapp.com",
+  projectId: "selfstudy-planner",
+  storageBucket: "selfstudy-planner.firebasestorage.app",
+  messagingSenderId: "283483008828",
+  appId: "1:283483008828:web:21f20545f2499294ac3839"
+};
+
+// 중복 초기화 방지
+const _app = firebase.apps.length
+  ? firebase.app()
+  : firebase.initializeApp(_firebaseConfig);
+const _auth = firebase.auth(_app);
+
+// 이미 로그인돼 있으면 홈으로
+_auth.onAuthStateChanged(user => {
+  if (user) location.href = 'index.html';
+});
+
+// ── UI 함수 ──────────────────────────────────
+function switchTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('tab-login').classList.toggle('active', isLogin);
+  document.getElementById('tab-signup').classList.toggle('active', !isLogin);
+  document.getElementById('login-form').style.display  = isLogin ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = isLogin ? 'none'  : 'block';
+  hideError();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-msg').style.display = 'none';
+}
+
+const ERR = {
+  'auth/user-not-found':      '등록된 이메일이 없어요.',
+  'auth/wrong-password':      '비밀번호가 틀렸어요.',
+  'auth/invalid-email':       '이메일 형식이 올바르지 않아요.',
+  'auth/email-already-in-use':'이미 사용 중인 이메일이에요.',
+  'auth/weak-password':       '비밀번호는 6자 이상이어야 해요.',
+  'auth/too-many-requests':   '너무 많이 시도했어요. 잠시 후 다시 해봐.',
+  'auth/invalid-credential':  '이메일 또는 비밀번호가 틀렸어요.',
+};
+
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  if (!email || !pw) { showError('이메일과 비밀번호를 입력해 주세요.'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = '로그인 중...';
+  try {
+    await _auth.signInWithEmailAndPassword(email, pw);
+  } catch(e) {
+    showError(ERR[e.code] || '로그인 실패. 다시 시도해 주세요.');
+    btn.disabled = false; btn.textContent = '로그인';
+  }
+}
+
+async function signup() {
+  const email = document.getElementById('signup-email').value.trim();
+  const pw    = document.getElementById('signup-pw').value;
+  const pw2   = document.getElementById('signup-pw2').value;
+  if (!email || !pw) { showError('이메일과 비밀번호를 입력해 주세요.'); return; }
+  if (pw !== pw2)    { showError('비밀번호가 일치하지 않아요.'); return; }
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = '가입 중...';
+  try {
+    await _auth.createUserWithEmailAndPassword(email, pw);
+  } catch(e) {
+    showError(ERR[e.code] || '가입 실패. 다시 시도해 주세요.');
+    btn.disabled = false; btn.textContent = '가입하기';
+  }
+}
+
+// 엔터키
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const isLogin = document.getElementById('login-form').style.display !== 'none';
+  if (isLogin) login(); else signup();
+});
+</script>
+</body>
+</html>

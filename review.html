@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주간 점검 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">주간 점검</span>
+</header>
+
+<main class="container">
+
+  <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+  <div id="main-content" style="display:none">
+
+    <!-- 1단계: 결과 -->
+    <div class="card mb-12">
+      <div class="card-label">이번 주 결과</div>
+      <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1" id="result-pct">—</div>
+      <p class="text-sm text-2 mt-8" id="result-detail"></p>
+      <div class="progress-track mt-12">
+        <div class="progress-fill" id="result-progress" style="width:0%"></div>
+      </div>
+      <div class="callout callout-primary mt-12" id="result-message"></div>
+    </div>
+
+    <!-- 2단계: 이유 -->
+    <div class="card mb-12" id="reason-step" style="display:none">
+      <div class="card-label">왜 그랬을까?</div>
+      <p class="text-sm text-2 mb-12">솔직하게 골라봐. 다음 작전을 위한 거야.</p>
+      <div class="chip-group" id="reason-chips">
+        <button class="chip" onclick="selectReason(this,'too-much')">계획이 너무 많았다</button>
+        <button class="chip" onclick="selectReason(this,'hard')">문제가 생각보다 어려웠다</button>
+        <button class="chip" onclick="selectReason(this,'no-time')">시간이 부족했다</button>
+        <button class="chip" onclick="selectReason(this,'unfocused')">집중이 잘 안 됐다</button>
+        <button class="chip" onclick="selectReason(this,'lazy')">하기 싫었다</button>
+        <button class="chip" onclick="selectReason(this,'schedule')">다른 일정이 많았다</button>
+        <button class="chip" onclick="selectReason(this,'unknown')">잘 모르겠다</button>
+      </div>
+    </div>
+
+    <!-- 3단계: 다음 주 -->
+    <div class="card mb-12" id="next-step" style="display:none">
+      <div class="card-label">다음 주 작전</div>
+      <div class="chip-group" id="next-chips">
+        <button class="chip" onclick="selectNext(this,'keep')">그대로 유지</button>
+        <button class="chip" onclick="selectNext(this,'less')">하루 분량 줄이기</button>
+        <button class="chip" onclick="selectNext(this,'weekend')">주말에 보충</button>
+        <button class="chip" onclick="selectNext(this,'slow')">어려운 단원 천천히</button>
+        <button class="chip" onclick="selectNext(this,'ask')">부모님 도움 요청</button>
+      </div>
+    </div>
+
+    <!-- 부모 코칭 -->
+    <div class="card mb-12" id="parent-coach" style="display:none">
+      <div class="card-label">부모님께</div>
+      <div class="text-sm" style="line-height:1.8;color:var(--text-2)" id="coach-message"></div>
+    </div>
+
+    <button class="btn btn-primary btn-lg" id="submit-btn" style="display:none" onclick="submitReview()">
+      주간 점검 완료
+    </button>
+
+    <!-- 완주 CTA -->
+    <div id="completion-cta" style="display:none;margin-top:16px">
+      <div class="card" style="border-color:var(--accent);background:var(--accent-dim);text-align:center;padding:28px">
+        <h3 class="mb-8">책 완주했어?</h3>
+        <p class="text-sm text-2 mb-16">전체 페이지를 다 끝냈다면 완주 리포트를 써봐</p>
+        <a href="report.html" class="btn btn-accent btn-lg">완주 리포트 쓰기</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <a href="index.html" data-page="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</a>
+  <a href="mission.html" data-page="mission"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션</a>
+  <a href="weekly.html" data-page="weekly"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표</a>
+  <a href="review.html" data-page="review" class="active"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검</a>
+  <a href="bookshelf.html" data-page="books"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장</a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let currentBook = null, weekGoal = 0, weekDone = 0, weekPct = 0;
+let selectedReason = '', selectedNext = '';
+
+const REASON_MSG = {
+  'too-much':'계획 분량이 좀 많았던 거야. 다음 주엔 줄여봐.',
+  'hard':'문제가 어려웠던 거야. 게으른 게 아니야. 어려운 단원은 천천히.',
+  'no-time':'시간이 부족했던 거야. 요일별 시간을 다시 점검해봐.',
+  'unfocused':'집중이 안 됐던 거야. 공부 시작 루틴을 만들어봐.',
+  'lazy':'하기 싫었던 거야. 솔직하게 말해줘서 고마워.',
+  'schedule':'일정이 바빴던 거야. 바쁜 주엔 목표를 낮추는 것도 전략이야.',
+  'unknown':'잘 모르겠다는 것도 괜찮아. 다음 주에 더 관찰해봐.',
+};
+const COACH_MSG = {
+  high:`"이번 주 계획을 잘 지켰네. 스스로 한 거야."`,
+  mid:`"다 못 지킨 것보다, 이유를 알고 조정한 게 더 중요해."`,
+  low:`"이번 주는 힘들었지? 계획이 너무 많았는지 같이 확인해보자."`,
+};
+
+async function init() {
+  currentBook = await getActiveBook();
+  document.getElementById('loading-msg').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  if (!currentBook) return;
+
+  const weekDates = getThisWeekDates();
+  const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
+  weekGoal = plan ? plan.dailyPages.reduce((a,b)=>a+b,0) : 0;
+  for (const d of weekDates) {
+    const log = await getDailyLog(currentBook.id, d);
+    if (log) weekDone += (log.completedPages||0);
+  }
+  weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
+
+  document.getElementById('result-pct').textContent = weekPct + '%';
+  document.getElementById('result-detail').textContent = `목표 ${weekGoal}쪽 중 ${weekDone}쪽 완료`;
+  document.getElementById('result-progress').style.width = Math.min(100,weekPct) + '%';
+  document.getElementById('result-message').textContent =
+    weekPct>=90 ? '이번 주 작전 성공. 잘 해냈어.' :
+    weekPct>=60 ? `${weekGoal-weekDone}쪽 못 했지만, 이유를 알면 다음 주엔 달라질 거야.` :
+    '이번 주는 힘들었지? 괜찮아. 계획을 다시 짜면 돼.';
+
+  document.getElementById('reason-step').style.display = 'block';
+
+  const totalDone = await getTotalCompleted(currentBook.id);
+  if (totalDone >= currentBook.totalPages) document.getElementById('completion-cta').style.display = 'block';
+}
+
+function selectReason(el, val) {
+  document.querySelectorAll('#reason-chips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); selectedReason = val;
+  document.getElementById('next-step').style.display = 'block';
+  document.getElementById('parent-coach').style.display = 'block';
+  document.getElementById('submit-btn').style.display = 'block';
+  const key = weekPct>=80?'high':weekPct>=50?'mid':'low';
+  document.getElementById('coach-message').innerHTML =
+    `이번 주 달성률 <strong>${weekPct}%</strong><br><br>` +
+    `아이에게: <em style="color:var(--success)">${COACH_MSG[key]}</em><br><br>` +
+    `이유: ${el.textContent} → ${REASON_MSG[val]}`;
+}
+
+function selectNext(el, val) {
+  document.querySelectorAll('#next-chips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected'); selectedNext = val;
+}
+
+async function submitReview() {
+  if (!selectedReason) { showToast('이유를 선택해 줘'); return; }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  const weekDates = getThisWeekDates();
+  try {
+    await db.collection('users').doc(USER_ID)
+      .collection('books').doc(currentBook.id)
+      .collection('weeklyReviews').doc(weekDates[0])
+      .set({ weekStart:weekDates[0], weekGoal, weekDone, weekPct, reason:selectedReason, nextPlan:selectedNext, savedAt:new Date().toISOString() });
+    if (selectedNext === 'less') {
+      const nextStart = (() => { const d=new Date(weekDates[0]); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
+      const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
+      if (plan) {
+        const np = plan.dailyPages.map(p=>p>0?Math.max(1,p-1):0);
+        await saveWeeklyPlan(currentBook.id, nextStart, { weekStart:nextStart, dailyPages:np, weekGoal:np.reduce((a,b)=>a+b,0), adjustedFrom:'review' });
+      }
+    }
+    showToast('주간 점검 완료');
+    setTimeout(() => location.href='index.html', 1200);
+  } catch(e) { console.error(e); showToast('저장 실패'); btn.disabled=false; btn.textContent='주간 점검 완료'; }
+}
+
+requireAuth(() => init());
+setActiveNav('review');
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Firebase
+.firebase/
+functions/node_modules/
+
+# 환경 변수 (API 키 포함 — 절대 커밋하지 마세요)
+functions/.env
+functions/.env.*
+.env
+.env.*

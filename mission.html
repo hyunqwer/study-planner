@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오늘의 미션 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">오늘의 미션</span>
+</header>
+
+<main class="container">
+
+  <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;display:block;margin-left:auto;margin-right:auto"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+  <div id="main-content" style="display:none">
+
+    <p class="text-sm text-3 mb-16" id="today-label"></p>
+
+    <!-- 미션 히어로 -->
+    <div class="hero-card mb-16" id="mission-header" style="cursor:default">
+      <div class="hero-label" id="mission-tag">오늘의 미션</div>
+      <div class="hero-title" id="mission-main-title"></div>
+      <div class="hero-sub" id="mission-sub"></div>
+    </div>
+
+    <!-- 완료 상태 -->
+    <div id="done-section" style="display:none">
+      <div class="card text-center" style="padding:36px 24px">
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--success-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3 class="mb-8">미션 완료</h3>
+        <p class="text-sm text-2 mb-24" id="done-summary"></p>
+        <a href="index.html" class="btn btn-primary btn-lg">홈으로</a>
+      </div>
+    </div>
+
+    <!-- 휴식일 -->
+    <div id="rest-section" style="display:none">
+      <div class="card text-center" style="padding:36px 24px">
+        <h3 class="mb-8">오늘은 휴식일</h3>
+        <p class="text-sm text-2">잘 쉬고 내일 다시 시작해</p>
+      </div>
+    </div>
+
+    <!-- 기록 입력 -->
+    <div id="action-section" style="display:none">
+
+      <!-- 오늘 페이지 입력 -->
+      <div class="card">
+        <div class="card-label">오늘 어디까지 했어?</div>
+
+        <!-- 시작/끝 페이지 -->
+        <div class="form-row mb-12">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">시작 페이지</label>
+            <input class="form-input" type="number" id="start-page" min="1"
+              placeholder="예: 12" inputmode="numeric">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">끝 페이지</label>
+            <input class="form-input" type="number" id="end-page" min="1"
+              placeholder="예: 18" inputmode="numeric">
+          </div>
+        </div>
+
+        <!-- 완료 쪽수 자동 표시 -->
+        <div id="pages-calc" style="display:none;padding:10px 12px;background:var(--surface-2);border-radius:var(--r);font-size:13px;color:var(--text-2)">
+          오늘 <strong id="pages-calc-num" style="color:var(--primary)">0</strong>쪽 완료
+        </div>
+      </div>
+
+      <!-- 난이도 -->
+      <div class="card">
+        <div class="card-label">난이도는?</div>
+        <div class="chip-group" id="difficulty-chips">
+          <button class="chip" onclick="selectChip('difficulty-chips',this,'easy')">쉬웠다</button>
+          <button class="chip" onclick="selectChip('difficulty-chips',this,'medium')">적당했다</button>
+          <button class="chip" onclick="selectChip('difficulty-chips',this,'hard')">어려웠다</button>
+          <button class="chip" onclick="selectChip('difficulty-chips',this,'vhard')">너무 어려웠다</button>
+        </div>
+      </div>
+
+      <!-- 못한 경우 이유 -->
+      <div class="card" id="skip-card" style="display:none">
+        <div class="card-label">오늘 못 한 이유</div>
+        <div class="chip-group" id="reason-chips">
+          <button class="chip" onclick="selectChip('reason-chips',this,'no-time')">시간이 없었다</button>
+          <button class="chip" onclick="selectChip('reason-chips',this,'hard')">문제가 어려웠다</button>
+          <button class="chip" onclick="selectChip('reason-chips',this,'lazy')">귀찮았다</button>
+          <button class="chip" onclick="selectChip('reason-chips',this,'forgot')">까먹었다</button>
+          <button class="chip" onclick="selectChip('reason-chips',this,'schedule')">다른 일이 있었다</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost btn-md flex-1" onclick="submitSkip()">오늘은 못 했어</button>
+        <button class="btn btn-primary btn-md" style="flex:2" onclick="submitMission()" id="submit-btn">기록 저장</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <a href="index.html" data-page="home">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈
+  </a>
+  <a href="mission.html" data-page="mission" class="active">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션
+  </a>
+  <a href="weekly.html" data-page="weekly">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표
+  </a>
+  <a href="review.html" data-page="review">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검
+  </a>
+  <a href="bookshelf.html" data-page="books">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let currentBook = null, todayPlannedPages = 0;
+let selectedDifficulty = '', selectedReason = '';
+const todayStr = today();
+
+document.getElementById('today-label').textContent =
+  `${new Date().getMonth()+1}월 ${new Date().getDate()}일 · ${DAY_KO[new Date().getDay()]}요일`;
+
+// 시작/끝 페이지 입력 시 완료 쪽수 자동 계산
+['start-page','end-page'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateCalc);
+});
+
+function updateCalc() {
+  const s = parseInt(document.getElementById('start-page').value) || 0;
+  const e = parseInt(document.getElementById('end-page').value) || 0;
+  const calc = document.getElementById('pages-calc');
+  if (s > 0 && e >= s) {
+    const count = e - s + 1;
+    document.getElementById('pages-calc-num').textContent = count;
+    calc.style.display = 'block';
+  } else {
+    calc.style.display = 'none';
+  }
+}
+
+function selectChip(groupId, el, val) {
+  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  if (groupId === 'difficulty-chips') selectedDifficulty = val;
+  if (groupId === 'reason-chips') selectedReason = val;
+}
+
+async function submitMission() {
+  const startPage = parseInt(document.getElementById('start-page').value) || 0;
+  const endPage   = parseInt(document.getElementById('end-page').value)   || 0;
+  if (!startPage || !endPage || endPage < startPage) {
+    showToast('시작·끝 페이지를 올바르게 입력해 줘'); return;
+  }
+  const completedPages = endPage - startPage + 1;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    await saveDailyLog(currentBook.id, {
+      date: todayStr,
+      status: completedPages >= todayPlannedPages ? 'done' : 'partial',
+      plannedPages: todayPlannedPages,
+      completedPages,
+      startPage,
+      endPage,
+      difficulty: selectedDifficulty,
+      reason: selectedReason,
+    });
+    showToast('기록 완료');
+    setTimeout(() => location.href = 'index.html', 1000);
+  } catch(e) {
+    console.error(e); showToast('저장 실패');
+    btn.disabled = false; btn.textContent = '기록 저장';
+  }
+}
+
+async function submitSkip() {
+  document.getElementById('skip-card').style.display = 'block';
+  // 이유 선택 후 저장
+  if (!selectedReason) { showToast('못 한 이유를 선택해 줘'); return; }
+  try {
+    await saveDailyLog(currentBook.id, {
+      date: todayStr, status: 'skip',
+      plannedPages: todayPlannedPages, completedPages: 0,
+      reason: selectedReason,
+    });
+    showToast('기록 완료');
+    setTimeout(() => location.href = 'index.html', 1000);
+  } catch(e) { console.error(e); showToast('저장 실패'); }
+}
+
+async function init() {
+  const bookId = getParam('bookId');
+  currentBook = bookId ? await getBook(bookId) : await getActiveBook();
+  document.getElementById('loading-msg').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  if (!currentBook) { document.getElementById('mission-main-title').textContent = '진행 중인 책 없음'; return; }
+
+  const todayLog = await getDailyLog(currentBook.id, todayStr);
+  if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) {
+    document.getElementById('mission-header').style.background = 'linear-gradient(135deg,#064e3b,#065f46)';
+    document.getElementById('mission-tag').textContent = '완료';
+    document.getElementById('mission-main-title').textContent = '오늘 기록 완료';
+    const pageInfo = todayLog.startPage && todayLog.endPage
+      ? `${todayLog.startPage}~${todayLog.endPage}쪽 (${todayLog.completedPages}쪽)`
+      : `${todayLog.completedPages}쪽`;
+    document.getElementById('mission-sub').textContent = pageInfo;
+    document.getElementById('done-section').style.display = 'block';
+    document.getElementById('done-summary').textContent = `${pageInfo} 완료 · 수고했어`;
+    return;
+  }
+
+  const weekDates = getThisWeekDates();
+  const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
+  const dayIdx = new Date().getDay();
+  const adjustedIdx = dayIdx === 0 ? 6 : dayIdx - 1;
+  todayPlannedPages = plan ? (plan.dailyPages[adjustedIdx] || 0) : currentBook.dailyPages || 5;
+
+  if (todayPlannedPages === 0) {
+    document.getElementById('mission-main-title').textContent = '오늘은 휴식일';
+    document.getElementById('mission-sub').textContent = '내일 다시 시작';
+    document.getElementById('rest-section').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('mission-main-title').textContent =
+    `오늘 목표 ${todayPlannedPages}쪽`;
+  document.getElementById('mission-sub').textContent =
+    `[${currentBook.subject}] ${currentBook.title}`;
+  document.getElementById('action-section').style.display = 'block';
+
+  // 이전 기록에서 끝 페이지 불러와 시작 페이지 자동 제안
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
+  const prevLog = await getDailyLog(currentBook.id, yStr);
+  if (prevLog && prevLog.endPage) {
+    document.getElementById('start-page').value = prevLog.endPage + 1;
+    document.getElementById('end-page').value   = prevLog.endPage + todayPlannedPages;
+    updateCalc();
+  }
+}
+requireAuth(() => init());
+setActiveNav('mission');
+</script>
+</body>
+</html>
