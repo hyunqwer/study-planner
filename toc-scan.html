@@ -123,13 +123,13 @@
     <!-- 1. 이미지 업로드 -->
     <div id="upload-step">
       <h2 class="mb-4">목차 사진을 올려줘</h2>
-      <p class="text-sm text-2 mb-16">책 목차 페이지를 찍은 사진이면 돼.<br>표지는 없어도 되고, JPG/PNG 사진을 권장해.</p>
+      <p class="text-sm text-2 mb-16">폰으로 목차를 찍어서 바로 올리면 돼.<br>큰 사진은 자동으로 줄이고 변환할게.</p>
 
       <div class="upload-zone" id="upload-zone"
         ondragover="event.preventDefault();this.classList.add('drag-over')"
         ondragleave="this.classList.remove('drag-over')"
         ondrop="handleDrop(event)">
-        <input type="file" accept="image/*" multiple id="file-input" onchange="handleFiles(this.files); this.value='';">
+        <input type="file" accept="image/*,.heic,.heif" multiple id="file-input" onchange="handleFiles(this.files); this.value='';">
         <div class="upload-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
@@ -337,6 +337,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
@@ -350,7 +351,12 @@ let scannedChapters = [];
 
 // Cloud Function 엔드포인트 (Hosting rewrite 경유)
 const ANALYZE_URL = '/api/analyzeToc';
-const SUPPORTED_DIRECT_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const DIRECT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PHONE_PHOTO_EXTENSIONS = /\.(jpe?g|png|webp|heic|heif)$/i;
+const MAX_IMAGE_DIMENSION = 1800;
+const MIN_IMAGE_DIMENSION = 1100;
+const TARGET_IMAGE_BYTES = 1400 * 1024;
+const MAX_TOTAL_BASE64_CHARS = 8 * 1024 * 1024;
 
 document.getElementById('scan-start-date').value = today();
 document.getElementById('r-start-page').addEventListener('input', updateScanPageInfo);
@@ -362,7 +368,7 @@ document.getElementById('scan-daily-pages').addEventListener('input', recalcScan
 // 파일 업로드
 // ────────────────────────────────────────
 function handleFiles(files) {
-  uploadedFiles = Array.from(files).filter(f => inferImageMimeType(f).startsWith('image/'));
+  uploadedFiles = Array.from(files).filter(isSupportedPhotoFile);
   if (!uploadedFiles.length) showToast('사진 파일을 선택해 주세요');
   renderPreviews();
 }
@@ -370,14 +376,17 @@ function handleFiles(files) {
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('upload-zone').classList.remove('drag-over');
-  uploadedFiles = Array.from(e.dataTransfer.files).filter(f => inferImageMimeType(f).startsWith('image/'));
+  uploadedFiles = Array.from(e.dataTransfer.files).filter(isSupportedPhotoFile);
   renderPreviews();
 }
 
 function renderPreviews() {
-  if (!uploadedFiles.length) return;
   const grid = document.getElementById('preview-grid');
   grid.innerHTML = '';
+  if (!uploadedFiles.length) {
+    document.getElementById('preview-list').style.display = 'none';
+    return;
+  }
   uploadedFiles.forEach((f, i) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -385,7 +394,7 @@ function renderPreviews() {
       wrap.style.cssText = 'position:relative;border-radius:var(--r);overflow:hidden;aspect-ratio:3/4;background:var(--surface-2)';
       wrap.innerHTML = `
         <img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-        <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:11px;color:var(--text-3)">미리보기 불가<br>JPG/PNG 권장</div>
+        <div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:11px;color:var(--text-3)">미리보기 불가<br>분석 전 변환할게</div>
         <button onclick="removeFile(${i})" style="position:absolute;top:4px;right:4px;
           width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);
           border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;
@@ -406,10 +415,10 @@ function removeFile(idx) {
 }
 
 // ────────────────────────────────────────
-// 이미지 → 리사이즈 후 base64 (최대 1200px)
+// 휴대폰 사진 → JPEG 압축 후 base64
 // ────────────────────────────────────────
 function inferImageMimeType(file) {
-  if (file.type) return file.type;
+  if (file.type) return file.type.toLowerCase();
   const name = (file.name || '').toLowerCase();
   if (/\.(jpg|jpeg)$/.test(name)) return 'image/jpeg';
   if (/\.png$/.test(name)) return 'image/png';
@@ -418,62 +427,121 @@ function inferImageMimeType(file) {
   return 'application/octet-stream';
 }
 
-function readFileAsBase64(file) {
+function isHeicFile(file) {
+  const mimeType = inferImageMimeType(file).toLowerCase();
+  return mimeType.includes('heic') || mimeType.includes('heif') || /\.(heic|heif)$/i.test(file.name || '');
+}
+
+function isSupportedPhotoFile(file) {
+  const mimeType = inferImageMimeType(file);
+  return mimeType.startsWith('image/') || PHONE_PHOTO_EXTENSIONS.test(file.name || '');
+}
+
+function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => resolve(String(e.target.result).split(',')[1]);
     reader.onerror = () => reject(new Error('사진 파일을 읽지 못했어요. 다른 사진으로 다시 시도해 주세요.'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
 
-function resizeImageToJpeg(file) {
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error('사진을 압축하지 못했어요. 다른 사진으로 다시 시도해 주세요.'));
+    }, type, quality);
+  });
+}
+
+function loadImageFromBlob(blob) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    const url = URL.createObjectURL(file);
+    const url = URL.createObjectURL(blob);
     img.onload = () => {
-      try {
-        const MAX = 1200;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-          else { width = Math.round(width * MAX / height); height = MAX; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        resolve(dataUrl.split(',')[1]);
-      } catch {
-        reject(new Error('사진을 분석용 이미지로 변환하지 못했어요. JPG 또는 PNG로 다시 올려 주세요.'));
-      } finally {
-        URL.revokeObjectURL(url);
-      }
+      URL.revokeObjectURL(url);
+      resolve(img);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('브라우저가 이 사진 형식을 읽지 못했어요. iPhone의 HEIC 사진이면 JPG/PNG로 바꿔서 다시 올려 주세요.'));
+      reject(new Error('사진을 읽지 못했어요. 다른 사진으로 다시 찍어서 올려 주세요.'));
     };
     img.src = url;
   });
 }
 
+async function convertHeicToJpegBlob(file) {
+  if (!window.heic2any) {
+    throw new Error('폰 사진 변환 도구를 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+  }
+  try {
+    const converted = await window.heic2any({
+      blob: file,
+      toType: 'image/jpeg',
+      quality: 0.9,
+    });
+    return Array.isArray(converted) ? converted[0] : converted;
+  } catch {
+    throw new Error('HEIC 사진을 변환하지 못했어요. 사진 앱에서 공유하거나 스크린샷으로 다시 올려 주세요.');
+  }
+}
+
+async function compressImageBlob(blob) {
+  const img = await loadImageFromBlob(blob);
+  let maxDim = MAX_IMAGE_DIMENSION;
+  let quality = 0.84;
+  let bestBlob = null;
+  const sourceWidth = img.naturalWidth || img.width;
+  const sourceHeight = img.naturalHeight || img.height;
+  let bestWidth = sourceWidth;
+  let bestHeight = sourceHeight;
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const scale = Math.min(1, maxDim / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    bestBlob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    bestWidth = width;
+    bestHeight = height;
+
+    if (bestBlob.size <= TARGET_IMAGE_BYTES) break;
+    if (quality > 0.64) quality -= 0.08;
+    else if (maxDim > MIN_IMAGE_DIMENSION) maxDim = Math.round(maxDim * 0.85);
+    else break;
+  }
+
+  return {
+    base64: await blobToBase64(bestBlob),
+    mimeType: 'image/jpeg',
+    size: bestBlob.size,
+    width: bestWidth,
+    height: bestHeight,
+  };
+}
+
 async function fileToImagePayload(file) {
   const mimeType = inferImageMimeType(file);
-  if (!mimeType.startsWith('image/')) {
+  if (!isSupportedPhotoFile(file)) {
     throw new Error('사진 파일만 업로드할 수 있어요.');
   }
 
   try {
-    return { base64: await resizeImageToJpeg(file), mimeType: 'image/jpeg' };
-  } catch (resizeErr) {
-    if (SUPPORTED_DIRECT_TYPES.includes(mimeType)) {
-      if (file.size > 8 * 1024 * 1024) {
-        throw new Error('사진 용량이 너무 커요. 화면을 조금 더 가까이 찍거나 작은 파일로 다시 올려 주세요.');
-      }
-      return { base64: await readFileAsBase64(file), mimeType };
+    const sourceBlob = isHeicFile(file) ? await convertHeicToJpegBlob(file) : file;
+    return await compressImageBlob(sourceBlob);
+  } catch (err) {
+    if (DIRECT_IMAGE_TYPES.includes(mimeType) && file.size <= TARGET_IMAGE_BYTES) {
+      return { base64: await blobToBase64(file), mimeType, size: file.size };
     }
-    throw resizeErr;
+    throw err;
   }
 }
 
@@ -489,11 +557,23 @@ async function startAnalysis() {
 
   try {
     document.getElementById('loading-msg').textContent = '사진을 준비하는 중...';
-    const imagePayloads = await Promise.all(uploadedFiles.map(f => fileToImagePayload(f)));
+    const imagePayloads = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      document.getElementById('loading-msg').textContent = `사진 준비 중 ${i + 1}/${uploadedFiles.length}`;
+      document.getElementById('loading-sub').textContent =
+        isHeicFile(file) ? '폰 사진 형식을 분석용 JPEG로 변환 중' : '큰 사진을 분석하기 좋은 크기로 압축 중';
+      imagePayloads.push(await fileToImagePayload(file));
+    }
     const images = imagePayloads.map(p => p.base64);
     const mimeTypes = imagePayloads.map(p => p.mimeType);
+    const totalPayloadSize = images.reduce((sum, b64) => sum + b64.length, 0);
+    if (totalPayloadSize > MAX_TOTAL_BASE64_CHARS) {
+      throw new Error('사진이 너무 많거나 커요. 목차가 잘 보이는 사진 1~3장만 골라서 다시 올려 주세요.');
+    }
 
     document.getElementById('loading-msg').textContent = 'AI가 분석 중...';
+    document.getElementById('loading-sub').textContent = '단원 이름과 시작 페이지를 읽는 중';
 
     // Firebase Cloud Function 호출 (API 키는 서버에서 처리)
     let response;
@@ -540,7 +620,7 @@ async function startAnalysis() {
     console.error(e);
     showStep('error');
     document.getElementById('error-msg').textContent =
-      e?.message || (typeof e === 'string' ? e : '사진을 처리하는 중 오류가 발생했어요. JPG/PNG 사진으로 다시 시도해 주세요.');
+      e?.message || (typeof e === 'string' ? e : '사진을 처리하는 중 오류가 발생했어요. 다시 찍어서 올려 주세요.');
   }
 }
 
