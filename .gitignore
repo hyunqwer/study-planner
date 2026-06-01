@@ -7,3 +7,5 @@ functions/.env
 functions/.env.*
 .env
 .env.*
+firebase-debug.log
+*.log
