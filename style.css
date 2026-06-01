@@ -568,6 +568,31 @@ p  { line-height: 1.6; }
 .callout-success { background: var(--success-dim);   border-color: var(--success); color: var(--text-2); }
 .callout-accent  { background: var(--accent-dim);    border-color: var(--accent);  color: var(--text-2); }
 
+/* ── Home dashboard ────────────────────────────── */
+.home-metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.home-metric-row > div {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 8px;
+  text-align: center;
+}
+.home-metric-row strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+.home-metric-row span {
+  display: block;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
 /* ── Inline list ───────────────────────────────── */
 .info-row {
   display: flex;

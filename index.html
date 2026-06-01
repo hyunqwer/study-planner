@@ -45,10 +45,49 @@
       <div class="hero-sub" id="today-summary-meta"></div>
     </div>
 
+    <!-- 오늘 총량 -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-12">
+        <div>
+          <div class="card-label" style="margin-bottom:4px">오늘 총량</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.3px" id="today-load-title">—</div>
+        </div>
+        <div class="stat-cell" style="min-width:86px">
+          <div class="stat-num" style="font-size:20px" id="today-load-pct">—</div>
+          <div class="stat-lbl">완료율</div>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="today-load-progress" style="width:0%"></div>
+      </div>
+      <div class="home-metric-row mt-12">
+        <div>
+          <strong id="today-mission-count">0/0</strong>
+          <span>미션</span>
+        </div>
+        <div>
+          <strong id="today-page-count">0쪽</strong>
+          <span>총 분량</span>
+        </div>
+        <div>
+          <strong id="today-time-count">0분</strong>
+          <span>예상 시간</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 오늘 미션 리스트 -->
     <div class="card">
-      <div class="card-label">오늘 미션</div>
+      <div class="flex items-center justify-between mb-12">
+        <div class="card-label" style="margin-bottom:0">오늘 미션</div>
+        <a href="mission.html" class="text-xs text-primary font-semibold">전체 보기</a>
+      </div>
       <div id="mission-list"></div>
+    </div>
+
+    <!-- 작전 메모 -->
+    <div class="callout callout-primary" id="strategy-memo">
+      작전 메모를 불러오는 중...
     </div>
 
     <!-- 이번 주 전체 -->
@@ -72,6 +111,26 @@
         <a href="weekly.html" class="btn btn-ghost btn-sm flex-1">주간 작전표</a>
         <a href="review.html" class="btn btn-ghost btn-sm flex-1">주간 점검</a>
       </div>
+    </div>
+
+    <!-- 작은 성취 -->
+    <div class="card">
+      <div class="card-label">이번 주 작은 성취</div>
+      <div class="home-metric-row">
+        <div>
+          <strong id="study-days-count">0일</strong>
+          <span>공부한 날</span>
+        </div>
+        <div>
+          <strong id="streak-count">0일</strong>
+          <span>연속 기록</span>
+        </div>
+        <div>
+          <strong id="adjust-count">0권</strong>
+          <span>관리 중</span>
+        </div>
+      </div>
+      <p class="text-sm text-2 mt-12" id="achievement-note"></p>
     </div>
 
     <div class="card">
@@ -128,6 +187,34 @@ const hr = now.getHours();
 document.getElementById('greeting-msg').textContent =
   hr < 12 ? '오늘 작전은?' : hr < 18 ? '집중할 시간이야' : '오늘 마무리 하자';
 
+function buildStrategyMemo({ todayPages, todayCount, todayDoneCount, weekPct, overloadedDays, behindBooks }) {
+  if (behindBooks.length) {
+    const first = behindBooks[0];
+    return `[${first.subject}] ${first.title}가 계획보다 약 ${first.behind}쪽 밀려 있어. 오늘은 완벽히 따라잡기보다 미션 하나를 정확히 끝내는 게 좋아.`;
+  }
+  if (overloadedDays.length) {
+    return `${overloadedDays.join(', ')}에 분량이 몰려 있어. 이번 주 작전표에서 하루만 가볍게 옮겨도 훨씬 편해질 거야.`;
+  }
+  if (todayCount > 0 && todayDoneCount === todayCount) {
+    return '오늘 미션을 모두 기록했어. 지금처럼 작게 끝내고 바로 체크하는 습관이 제일 강한 작전이야.';
+  }
+  if (todayPages >= 25) {
+    return `오늘은 ${todayPages}쪽으로 조금 무거운 날이야. 어려운 교재부터 먼저 하고, 나머지는 일부 완료로 남겨도 괜찮아.`;
+  }
+  if (weekPct >= 80) {
+    return `이번 주 흐름이 좋아. 계획을 더 늘리기보다 지금 리듬을 유지하는 게 우선이야.`;
+  }
+  return '오늘 할 일은 작게 쪼개서 하나씩 체크하자. 못 한 날이 있어도 주간 점검에서 다시 조정하면 돼.';
+}
+
+function buildAchievementNote({ todayCount, todayDoneCount, studyDays, streak, weekPct }) {
+  if (todayCount > 0 && todayDoneCount === todayCount) return '오늘 미션을 모두 기록했어. 결과보다 기록을 남긴 게 진짜 실력이야.';
+  if (streak >= 3) return `${streak}일 연속으로 기록 중이야. 짧게라도 이어가는 힘이 생기고 있어.`;
+  if (studyDays >= 3) return `이번 주 ${studyDays}일이나 공부 기록이 있어. 완벽하지 않아도 루틴은 만들어지고 있어.`;
+  if (weekPct >= 60) return '이번 주 계획을 절반 이상 따라가고 있어. 이제 어느 요일이 무거운지만 보면 돼.';
+  return '이번 주는 관찰 주간으로 봐도 괜찮아. 어떤 교재와 요일이 어려운지 알아내는 중이야.';
+}
+
 async function loadHome() {
   showLoading(true);
   try {
@@ -142,7 +229,10 @@ async function loadHome() {
     const todayIdx = weekIndexForToday();
     const missionRows = [];
     const progressRows = [];
-    let todayCount = 0, todayDoneCount = 0, todayPages = 0;
+    const dayTotals = Array(7).fill(0);
+    const studyDates = new Set();
+    const behindBooks = [];
+    let todayCount = 0, todayDoneCount = 0, todayPages = 0, todayDonePages = 0;
     let weekDone = 0, weekGoal = 0;
 
     for (const book of books) {
@@ -151,19 +241,33 @@ async function loadHome() {
       const todayLog = await getDailyLog(book.id, today());
       const completed = await getTotalCompleted(book.id);
       const totalPct = book.totalPages > 0 ? Math.min(100, Math.round(completed / book.totalPages * 100)) : 0;
+      const bookWeekGoal = plan.dailyPages.reduce((a, b) => a + b, 0);
+      plan.dailyPages.forEach((pages, i) => { dayTotals[i] += pages || 0; });
+
+      const totalDays = Math.max(1, diffDays(book.startDate, book.targetEndDate));
+      const elapsedDays = Math.max(0, diffDays(book.startDate, today()));
+      const expectedPages = Math.min(book.totalPages || 0, Math.floor((book.totalPages || 0) * elapsedDays / totalDays));
+      const behind = expectedPages - completed;
+      if (behind >= 8) behindBooks.push({ title: book.title, subject: book.subject, behind });
 
       let bookWeekDone = 0;
       for (const d of weekDates) {
         const log = await getDailyLog(book.id, d);
-        if (log) bookWeekDone += (log.completedPages || 0);
+        if (log) {
+          bookWeekDone += (log.completedPages || 0);
+          if ((log.completedPages || 0) > 0) studyDates.add(d);
+        }
       }
       weekDone += bookWeekDone;
-      weekGoal += plan.dailyPages.reduce((a, b) => a + b, 0);
+      weekGoal += bookWeekGoal;
 
       if (todayPlan > 0) {
         todayCount++;
         todayPages += todayPlan;
-        if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) todayDoneCount++;
+        if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) {
+          todayDoneCount++;
+          todayDonePages += (todayLog.completedPages || 0);
+        }
       }
 
       const statusBadge = todayPlan === 0
@@ -174,7 +278,7 @@ async function loadHome() {
             ? '<span class="badge badge-accent">일부</span>'
             : todayLog && todayLog.status === 'skip'
               ? '<span class="badge badge-muted">미완</span>'
-              : '<span class="badge badge-primary">오늘</span>';
+              : '<span class="badge badge-primary">기록하기</span>';
 
       missionRows.push(`
         <div class="list-item" onclick="location.href='mission.html?bookId=${book.id}'">
@@ -201,22 +305,47 @@ async function loadHome() {
           </div>
           <div class="progress-meta mt-4">
             <span>${completed} / ${book.totalPages}쪽</span>
-            <span>${Math.max(0, diffDays(today(), book.targetEndDate))}일 남음</span>
+            <span>${behind >= 8 ? `${behind}쪽 밀림` : `${Math.max(0, diffDays(today(), book.targetEndDate))}일 남음`}</span>
           </div>
         </div>
       `);
+    }
+
+    const weekPct = weekGoal > 0 ? Math.round(weekDone / weekGoal * 100) : 0;
+    const todayPct = todayCount > 0 ? Math.round(todayDoneCount / todayCount * 100) : 0;
+    const overloadedDays = dayTotals
+      .map((pages, i) => pages >= 25 ? `${DAY_KO[new Date(weekDates[i]).getDay()]}요일 ${pages}쪽` : null)
+      .filter(Boolean);
+    let streak = 0;
+    for (let i = todayIdx; i >= 0; i--) {
+      if (!studyDates.has(weekDates[i])) break;
+      streak++;
     }
 
     document.getElementById('today-summary-title').textContent =
       todayCount > 0 ? `${todayDoneCount}/${todayCount}개 미션 진행` : '오늘은 쉬는 날';
     document.getElementById('today-summary-meta').textContent =
       todayCount > 0 ? `총 ${todayPages}쪽 · 예상 ${Math.ceil(todayPages * 5)}분` : '내일 다시 작전을 이어가자';
+    document.getElementById('today-load-title').textContent =
+      todayCount > 0 ? `${todayPages}쪽 · 약 ${Math.ceil(todayPages * 5)}분` : '휴식일';
+    document.getElementById('today-load-pct').textContent = todayCount > 0 ? todayPct + '%' : '—';
+    document.getElementById('today-load-progress').style.width = todayPct + '%';
+    document.getElementById('today-mission-count').textContent = `${todayDoneCount}/${todayCount}`;
+    document.getElementById('today-page-count').textContent =
+      todayCount > 0 && todayDonePages > 0 ? `${todayDonePages}/${todayPages}쪽` : `${todayPages}쪽`;
+    document.getElementById('today-time-count').textContent = todayCount > 0 ? `${Math.ceil(todayPages * 5)}분` : '0분';
     document.getElementById('mission-list').innerHTML = missionRows.join('');
+    document.getElementById('strategy-memo').textContent =
+      buildStrategyMemo({ todayPages, todayCount, todayDoneCount, weekPct, overloadedDays, behindBooks });
     document.getElementById('book-progress-list').innerHTML = progressRows.join('');
     document.getElementById('week-done').textContent = weekDone;
     document.getElementById('active-count').textContent = books.length;
-    document.getElementById('week-pct').textContent =
-      weekGoal > 0 ? Math.round(weekDone / weekGoal * 100) + '%' : '—';
+    document.getElementById('week-pct').textContent = weekGoal > 0 ? weekPct + '%' : '—';
+    document.getElementById('study-days-count').textContent = studyDates.size + '일';
+    document.getElementById('streak-count').textContent = streak + '일';
+    document.getElementById('adjust-count').textContent = books.length + '권';
+    document.getElementById('achievement-note').textContent =
+      buildAchievementNote({ todayCount, todayDoneCount, studyDays: studyDates.size, streak, weekPct });
 
   } catch(e) { console.error(e); }
   finally { showLoading(false); }
