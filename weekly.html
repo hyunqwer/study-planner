@@ -27,7 +27,7 @@
     <div class="card" style="background:var(--surface-2)">
       <div class="flex items-center justify-between mb-12">
         <div>
-          <div class="card-label" style="margin-bottom:4px">이번 주 목표</div>
+          <div class="card-label" style="margin-bottom:4px">이번 주 전체 목표</div>
           <div style="font-size:22px;font-weight:800;letter-spacing:-.3px" id="week-goal-display"></div>
         </div>
         <div class="stat-cell" style="min-width:80px">
@@ -44,21 +44,26 @@
       </div>
     </div>
 
-    <!-- 요일별 테이블 -->
+    <!-- 교재별 테이블 -->
     <div class="card">
       <div class="flex items-center justify-between mb-16">
-        <div class="card-label" style="margin-bottom:0">요일별 계획</div>
+        <div class="card-label" style="margin-bottom:0">교재별 주간 계획</div>
         <button class="btn btn-ghost btn-sm" onclick="toggleEdit()" id="edit-btn">수정</button>
       </div>
 
-      <table class="week-table" id="week-table">
-        <thead>
-          <tr>
-            <th>요일</th><th>계획</th><th>완료</th><th>상태</th>
-          </tr>
-        </thead>
-        <tbody id="week-tbody"></tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table class="week-table" id="week-table" style="min-width:620px">
+          <thead>
+            <tr>
+              <th>교재</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th><th>일</th><th>완료</th>
+            </tr>
+          </thead>
+          <tbody id="week-tbody"></tbody>
+          <tfoot>
+            <tr id="day-total-row"></tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
 
     <!-- 편집 모드 -->
@@ -72,7 +77,7 @@
 
     <!-- 작전 변경 제안 -->
     <div class="card" id="catchup-card" style="display:none;border-color:var(--accent)">
-      <div class="card-label" style="color:var(--accent)">작전 수정 필요</div>
+      <div class="card-label" style="color:var(--accent)">작전 조정 제안</div>
       <p class="text-sm text-2 mb-12" id="catchup-msg"></p>
       <div id="catchup-options"></div>
     </div>
@@ -100,99 +105,109 @@
 <script src="app.js"></script>
 <script>
 const DAYS = ['월','화','수','목','금','토','일'];
-let currentBook = null, weekDates = [], weekStart = '';
-let currentPlan = null, dailyLogs = {}, isEditing = false;
+let activeBooks = [], weekDates = [], weekStart = '';
+let bookStates = [], dayTotals = [], isEditing = false;
 
 async function init() {
-  currentBook = await getActiveBook();
+  activeBooks = await getActiveBooks();
   document.getElementById('loading-msg').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
-  if (!currentBook) { document.getElementById('week-goal-display').textContent = '진행 중인 책 없음'; return; }
+  if (!activeBooks.length) { document.getElementById('week-goal-display').textContent = '진행 중인 책 없음'; return; }
 
   weekDates = getThisWeekDates();
   weekStart = weekDates[0];
-  currentPlan = await getWeeklyPlan(currentBook.id, weekStart);
-  if (!currentPlan) {
-    const workDays = currentBook.workDays || [1,2,4,5];
-    const dp = weekDates.map(d => workDays.includes(new Date(d).getDay()) ? (currentBook.dailyPages||5) : 0);
-    currentPlan = { weekStart, dailyPages: dp, weekGoal: dp.reduce((a,b)=>a+b,0) };
-    await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
+  bookStates = [];
+  for (const book of activeBooks) {
+    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+    const logs = {};
+    for (const d of weekDates) logs[d] = await getDailyLog(book.id, d);
+    bookStates.push({ book, plan, logs });
   }
-  for (const d of weekDates) dailyLogs[d] = await getDailyLog(currentBook.id, d);
-  renderTable(); renderSummary(); checkCatchup();
+  renderTable(); renderSummary(); checkLoadSuggestions();
 }
 
 function renderTable() {
   const tbody = document.getElementById('week-tbody');
   const todayStr = today();
   tbody.innerHTML = '';
-  weekDates.forEach((d, i) => {
-    const log = dailyLogs[d];
-    const planned = currentPlan.dailyPages[i] || 0;
-    const done = log ? (log.completedPages || 0) : null;
-    const isToday = d === todayStr;
-    let status = '';
-    if (planned === 0) status = '<span class="badge badge-muted">휴식</span>';
-    else if (log && log.status === 'done') status = '<span class="badge badge-success">완료</span>';
-    else if (log && log.status === 'partial') status = '<span class="badge badge-accent">일부</span>';
-    else if (log && log.status === 'skip') status = '<span class="badge badge-muted">미완</span>';
-    else if (isToday) status = '<span class="badge badge-primary">오늘</span>';
-    else status = '<span class="text-3 text-xs">—</span>';
+
+  bookStates.forEach(state => {
     const tr = document.createElement('tr');
-    if (isToday) tr.classList.add('today');
-    if (log && log.status === 'done') tr.classList.add('done');
-    tr.innerHTML = `<td><strong>${DAYS[i]}</strong></td><td>${planned>0?planned+'쪽':'—'}</td><td>${done!==null?done+'쪽':'—'}</td><td>${status}</td>`;
+    const weekDone = weekDates.reduce((sum, d) => sum + (state.logs[d]?.completedPages || 0), 0);
+    const cells = state.plan.dailyPages.map((planned, i) => {
+      const d = weekDates[i];
+      const log = state.logs[d];
+      const done = log?.completedPages || 0;
+      const isToday = d === todayStr;
+      const label = planned > 0 ? `${planned}쪽` : '—';
+      const doneText = done > 0 ? `<br><span class="text-xs text-success">${done}쪽</span>` : '';
+      const todayClass = isToday ? ' class="today"' : '';
+      return `<td${todayClass}>${label}${doneText}</td>`;
+    }).join('');
+    tr.innerHTML = `
+      <td style="min-width:120px;text-align:left">
+        <strong>${state.book.title}</strong><br>
+        <span class="text-xs text-3">[${state.book.subject}]</span>
+      </td>
+      ${cells}
+      <td><strong>${weekDone}쪽</strong></td>
+    `;
     tbody.appendChild(tr);
   });
+
+  dayTotals = weekDates.map((_, i) => bookStates.reduce((sum, state) => sum + (state.plan.dailyPages[i] || 0), 0));
+  document.getElementById('day-total-row').innerHTML = `
+    <td><strong>총량</strong></td>
+    ${dayTotals.map((total, i) => `<td${weekDates[i] === todayStr ? ' class="today"' : ''}><strong>${total || '—'}</strong>${total ? '<br><span class="text-xs text-3">쪽</span>' : ''}</td>`).join('')}
+    <td><strong>${dayTotals.reduce((a,b)=>a+b,0)}쪽</strong></td>
+  `;
 }
 
 function renderSummary() {
-  const goal = currentPlan.dailyPages.reduce((a,b)=>a+b,0);
+  const goal = bookStates.reduce((sum, state) => sum + state.plan.dailyPages.reduce((a,b)=>a+b,0), 0);
   let done = 0;
-  weekDates.forEach(d => { if (dailyLogs[d]) done += (dailyLogs[d].completedPages||0); });
+  bookStates.forEach(state => {
+    weekDates.forEach(d => { done += state.logs[d]?.completedPages || 0; });
+  });
   const pct = goal>0 ? Math.round(done/goal*100) : 0;
   document.getElementById('week-goal-display').textContent = goal + '쪽';
   document.getElementById('week-period').textContent = `${formatDate(weekStart)} — ${formatDate(weekDates[6])}`;
-  document.getElementById('week-progress').style.width = pct + '%';
+  document.getElementById('week-progress').style.width = Math.min(100, pct) + '%';
   document.getElementById('week-done-label').textContent = `${done}쪽 완료`;
   document.getElementById('week-pct-label').textContent = pct + '%';
 }
 
-async function checkCatchup() {
-  const totalDone = await getTotalCompleted(currentBook.id);
-  const elapsed = diffDays(currentBook.startDate, today());
-  const totalDays = diffDays(currentBook.startDate, currentBook.targetEndDate);
-  const expected = Math.floor(currentBook.totalPages * elapsed / totalDays);
-  const behind = expected - totalDone;
-  if (behind > 10) {
-    document.getElementById('catchup-card').style.display = 'block';
-    document.getElementById('catchup-msg').textContent = `현재 계획보다 약 ${behind}쪽 밀려 있어. 어떻게 할까?`;
-    const opts = calcCatchupOptions(currentBook, totalDone);
-    document.getElementById('catchup-options').innerHTML = opts.map(o => `
-      <button class="btn btn-ghost btn-md w-full mb-8" onclick="applyCatchup('${o.id}')">
-        <span>${o.label}</span><span class="text-2 text-sm">${o.detail}</span>
-      </button>
-    `).join('');
-  }
-}
+function checkLoadSuggestions() {
+  document.getElementById('catchup-card').style.display = 'none';
+  const overloaded = dayTotals
+    .map((total, i) => ({ total, i }))
+    .filter(d => d.total >= 25);
+  const behindBooks = [];
 
-async function applyCatchup(id) {
-  if (id === 'A') {
-    const done = await getTotalCompleted(currentBook.id);
-    const daily = Math.ceil((currentBook.totalPages-done)/Math.max(1,diffDays(today(),currentBook.targetEndDate)));
-    currentPlan.dailyPages = currentPlan.dailyPages.map(p => p>0?daily:0);
-    currentPlan.weekGoal = currentPlan.dailyPages.reduce((a,b)=>a+b,0);
-    await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
-    showToast('작전 변경 완료');
-    renderTable(); renderSummary();
-    document.getElementById('catchup-card').style.display = 'none';
-  } else if (id === 'C') {
-    const nd = new Date(currentBook.targetEndDate);
-    nd.setDate(nd.getDate()+7);
-    await updateBook(currentBook.id, { targetEndDate: nd.toISOString().slice(0,10) });
-    showToast('목표일을 1주 연장했어');
-    document.getElementById('catchup-card').style.display = 'none';
-  } else { if (!isEditing) toggleEdit(); }
+  bookStates.forEach(state => {
+    const totalDone = weekDates.reduce((sum, d) => sum + (state.logs[d]?.completedPages || 0), 0);
+    const goal = state.plan.dailyPages.reduce((a,b)=>a+b,0);
+    if (goal > 0 && totalDone / goal < 0.6) behindBooks.push(state.book.title);
+  });
+
+  if (!overloaded.length && !behindBooks.length) return;
+
+  document.getElementById('catchup-card').style.display = 'block';
+  const loadText = overloaded.length
+    ? `${overloaded.map(d => `${DAYS[d.i]}요일 ${d.total}쪽`).join(', ')}로 분량이 몰려 있어.`
+    : '';
+  const behindText = behindBooks.length
+    ? `${behindBooks.join(', ')} 교재가 이번 주 목표보다 많이 밀려 있어.`
+    : '';
+  document.getElementById('catchup-msg').textContent = [loadText, behindText].filter(Boolean).join(' ');
+  document.getElementById('catchup-options').innerHTML = `
+    <button class="btn btn-ghost btn-md w-full mb-8" onclick="toggleEdit()">
+      요일별 분량 직접 조정하기
+    </button>
+    <a class="btn btn-ghost btn-md w-full" href="review.html">
+      주간 점검에서 다음 주 작전 정하기
+    </a>
+  `;
 }
 
 function toggleEdit() {
@@ -200,28 +215,37 @@ function toggleEdit() {
   document.getElementById('edit-section').style.display = isEditing ? 'block' : 'none';
   document.getElementById('edit-btn').textContent = isEditing ? '취소' : '수정';
   if (isEditing) {
-    document.getElementById('edit-inputs').innerHTML = weekDates.map((d, i) => `
-      <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--border)">
-        <span class="text-sm font-semibold">${DAYS[i]}요일</span>
-        <div class="flex items-center gap-8">
-          <input class="form-input" type="number" min="0" id="edit-day-${i}"
-            value="${currentPlan.dailyPages[i]||0}" style="width:72px;text-align:center">
-          <span class="text-sm text-3">쪽</span>
-        </div>
+    document.getElementById('edit-inputs').innerHTML = bookStates.map((state, bookIdx) => `
+      <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+        <div class="text-sm font-semibold mb-8">[${state.book.subject}] ${state.book.title}</div>
+        ${weekDates.map((_, i) => `
+          <div class="flex items-center justify-between" style="padding:6px 0">
+            <span class="text-sm">${DAYS[i]}요일</span>
+            <div class="flex items-center gap-8">
+              <input class="form-input" type="number" min="0" id="edit-${bookIdx}-${i}"
+                value="${state.plan.dailyPages[i]||0}" style="width:72px;text-align:center">
+              <span class="text-sm text-3">쪽</span>
+            </div>
+          </div>
+        `).join('')}
       </div>
     `).join('');
   }
 }
 
 async function savePlan() {
-  const np = weekDates.map((_,i) => parseInt(document.getElementById(`edit-day-${i}`).value)||0);
-  currentPlan.dailyPages = np; currentPlan.weekGoal = np.reduce((a,b)=>a+b,0);
-  await saveWeeklyPlan(currentBook.id, weekStart, currentPlan);
+  for (let bookIdx = 0; bookIdx < bookStates.length; bookIdx++) {
+    const state = bookStates[bookIdx];
+    const nextPages = weekDates.map((_, i) => parseInt(document.getElementById(`edit-${bookIdx}-${i}`).value)||0);
+    state.plan.dailyPages = nextPages;
+    state.plan.weekGoal = nextPages.reduce((a,b)=>a+b,0);
+    await saveWeeklyPlan(state.book.id, weekStart, state.plan);
+  }
   showToast('저장 완료');
   isEditing = false;
   document.getElementById('edit-section').style.display = 'none';
   document.getElementById('edit-btn').textContent = '수정';
-  renderTable(); renderSummary();
+  renderTable(); renderSummary(); checkLoadSuggestions();
 }
 
 requireAuth(() => init());

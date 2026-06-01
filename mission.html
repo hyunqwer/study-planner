@@ -26,6 +26,14 @@
 
     <p class="text-sm text-3 mb-16" id="today-label"></p>
 
+    <!-- 여러 교재 미션 목록 -->
+    <div id="mission-list-section" style="display:none">
+      <div class="card">
+        <div class="card-label">오늘 미션</div>
+        <div id="mission-list"></div>
+      </div>
+    </div>
+
     <!-- 미션 히어로 -->
     <div class="hero-card mb-16" id="mission-header" style="cursor:default">
       <div class="hero-label" id="mission-tag">오늘의 미션</div>
@@ -211,11 +219,58 @@ async function submitSkip() {
   } catch(e) { console.error(e); showToast('저장 실패'); }
 }
 
+async function renderMissionList(books) {
+  const weekDates = getThisWeekDates();
+  const todayIdx = weekIndexForToday();
+  const rows = [];
+  for (const book of books) {
+    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+    const planned = plan.dailyPages[todayIdx] || 0;
+    const log = await getDailyLog(book.id, todayStr);
+    const badge = planned === 0
+      ? '<span class="badge badge-muted">휴식</span>'
+      : log && log.status === 'done'
+        ? '<span class="badge badge-success">완료</span>'
+        : log && log.status === 'partial'
+          ? '<span class="badge badge-accent">일부</span>'
+          : log && log.status === 'skip'
+            ? '<span class="badge badge-muted">미완</span>'
+            : '<span class="badge badge-primary">기록하기</span>';
+    rows.push(`
+      <div class="list-item" onclick="location.href='mission.html?bookId=${book.id}'">
+        <div class="list-item-icon">${book.subject?.slice(0, 1) || '책'}</div>
+        <div class="list-item-body">
+          <div class="list-item-title">[${book.subject}] ${book.title}</div>
+          <div class="list-item-sub">${planned > 0 ? `오늘 ${planned}쪽 · 예상 ${Math.ceil(planned * 5)}분` : '오늘은 쉬는 날'}</div>
+          <div class="mt-8">${badge}</div>
+        </div>
+        <div class="list-item-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    `);
+  }
+  document.getElementById('mission-list').innerHTML = rows.join('');
+  document.getElementById('mission-list-section').style.display = 'block';
+  document.getElementById('mission-header').style.display = 'none';
+}
+
 async function init() {
   const bookId = getParam('bookId');
-  currentBook = bookId ? await getBook(bookId) : await getActiveBook();
   document.getElementById('loading-msg').style.display = 'none';
   document.getElementById('main-content').style.display = 'block';
+
+  if (!bookId) {
+    const books = await getActiveBooks();
+    if (!books.length) {
+      document.getElementById('mission-main-title').textContent = '진행 중인 책 없음';
+      return;
+    }
+    await renderMissionList(books);
+    return;
+  }
+
+  currentBook = await getBook(bookId);
   if (!currentBook) { document.getElementById('mission-main-title').textContent = '진행 중인 책 없음'; return; }
 
   const todayLog = await getDailyLog(currentBook.id, todayStr);
@@ -233,9 +288,8 @@ async function init() {
   }
 
   const weekDates = getThisWeekDates();
-  const plan = await getWeeklyPlan(currentBook.id, weekDates[0]);
-  const dayIdx = new Date().getDay();
-  const adjustedIdx = dayIdx === 0 ? 6 : dayIdx - 1;
+  const plan = await getOrCreateWeeklyPlan(currentBook, weekDates);
+  const adjustedIdx = weekIndexForToday();
   todayPlannedPages = plan ? (plan.dailyPages[adjustedIdx] || 0) : currentBook.dailyPages || 5;
 
   if (todayPlannedPages === 0) {

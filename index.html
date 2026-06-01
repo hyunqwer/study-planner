@@ -38,39 +38,22 @@
   <!-- 책 있음 -->
   <div id="active-book-section" style="display:none">
 
-    <!-- 오늘 미션 히어로 카드 -->
-    <div class="hero-card" id="mission-box" onclick="location.href='mission.html?bookId='+currentBookId">
-      <div class="hero-label" id="mission-tag">오늘의 미션</div>
-      <div class="hero-title" id="mission-title">로딩 중...</div>
-      <div class="hero-sub" id="mission-meta"></div>
-      <div style="margin-top:20px">
-        <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);padding:8px 16px;border-radius:99px;font-size:13px;font-weight:600;color:#fff">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          시작하기
-        </span>
-      </div>
+    <!-- 오늘 미션 요약 -->
+    <div class="hero-card" style="cursor:default">
+      <div class="hero-label">오늘의 작전</div>
+      <div class="hero-title" id="today-summary-title">로딩 중...</div>
+      <div class="hero-sub" id="today-summary-meta"></div>
     </div>
 
-    <!-- 전체 진행률 -->
+    <!-- 오늘 미션 리스트 -->
     <div class="card">
-      <div class="card-label">전체 진행률</div>
-      <div class="text-sm font-semibold mb-8" id="book-title-display"></div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-      </div>
-      <div class="progress-meta mt-4">
-        <span id="progress-pages" class="text-2">0 / 0쪽</span>
-        <span id="progress-pct" class="font-bold text-primary">0%</span>
-      </div>
-      <div class="flex gap-8 mt-12">
-        <span class="badge badge-muted" id="target-date-badge"></span>
-        <span class="badge badge-muted" id="days-left-badge"></span>
-      </div>
+      <div class="card-label">오늘 미션</div>
+      <div id="mission-list"></div>
     </div>
 
-    <!-- 이번 주 -->
+    <!-- 이번 주 전체 -->
     <div class="card">
-      <div class="card-label">이번 주 달성률</div>
+      <div class="card-label">이번 주 전체 달성률</div>
       <div class="stat-grid mb-12">
         <div class="stat-cell">
           <div class="stat-num" id="week-pct">—</div>
@@ -80,11 +63,20 @@
           <div class="stat-num" id="week-done">0</div>
           <div class="stat-lbl">완료 쪽수</div>
         </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="active-count">0</div>
+          <div class="stat-lbl">진행 교재</div>
+        </div>
       </div>
       <div class="flex gap-8">
         <a href="weekly.html" class="btn btn-ghost btn-sm flex-1">주간 작전표</a>
         <a href="review.html" class="btn btn-ghost btn-sm flex-1">주간 점검</a>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">교재별 진행률</div>
+      <div id="book-progress-list"></div>
     </div>
 
     <!-- 바로가기 -->
@@ -128,8 +120,6 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
-let currentBookId = null;
-
 const now = new Date();
 document.getElementById('greeting-date').textContent =
   `${now.getMonth()+1}월 ${now.getDate()}일 · ${DAY_KO[now.getDay()]}요일`;
@@ -141,58 +131,90 @@ document.getElementById('greeting-msg').textContent =
 async function loadHome() {
   showLoading(true);
   try {
-    const book = await getActiveBook();
-    if (!book) {
+    const books = await getActiveBooks();
+    if (!books.length) {
       document.getElementById('no-book-section').style.display = 'block';
       return;
     }
-    currentBookId = book.id;
     document.getElementById('active-book-section').style.display = 'block';
 
-    document.getElementById('book-title-display').textContent =
-      `[${book.subject}] ${book.title}`;
-
-    const completed = await getTotalCompleted(book.id);
-    const pct = Math.min(100, Math.round(completed / book.totalPages * 100));
-    document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('progress-pages').textContent = `${completed} / ${book.totalPages}쪽`;
-    document.getElementById('progress-pct').textContent = pct + '%';
-
-    const daysLeft = diffDays(today(), book.targetEndDate);
-    document.getElementById('target-date-badge').textContent = `목표 ${formatDate(book.targetEndDate)}`;
-    document.getElementById('days-left-badge').textContent =
-      daysLeft > 0 ? `${daysLeft}일 남음` : '오늘 마감';
-
-    const todayLog = await getDailyLog(book.id, today());
     const weekDates = getThisWeekDates();
-    const plan = await getWeeklyPlan(book.id, weekDates[0]);
-    const dayIdx = new Date().getDay();
-    const adjustedIdx = dayIdx === 0 ? 6 : dayIdx - 1;
-    const todayPlan = plan ? (plan.dailyPages[adjustedIdx] || 0) : 0;
-
-    if (todayLog && todayLog.status === 'done') {
-      document.getElementById('mission-box').style.background =
-        'linear-gradient(135deg, #064e3b 0%, #065f46 100%)';
-      document.getElementById('mission-tag').textContent = '완료';
-      document.getElementById('mission-title').textContent = '오늘 미션 완료';
-      document.getElementById('mission-meta').textContent = `${todayLog.completedPages}쪽 · 수고했어`;
-    } else if (todayPlan > 0) {
-      document.getElementById('mission-title').textContent =
-        `${book.title} ${todayPlan}쪽`;
-      document.getElementById('mission-meta').textContent =
-        `[${book.subject}] · 예상 ${Math.ceil(todayPlan * 5)}분`;
-    } else {
-      document.getElementById('mission-title').textContent = '오늘은 휴식일';
-      document.getElementById('mission-meta').textContent = '내일 다시 시작';
-    }
-
+    const todayIdx = weekIndexForToday();
+    const missionRows = [];
+    const progressRows = [];
+    let todayCount = 0, todayDoneCount = 0, todayPages = 0;
     let weekDone = 0, weekGoal = 0;
-    if (plan) weekGoal = plan.dailyPages.reduce((a, b) => a + b, 0);
-    for (const d of weekDates) {
-      const log = await getDailyLog(book.id, d);
-      if (log) weekDone += (log.completedPages || 0);
+
+    for (const book of books) {
+      const plan = await getOrCreateWeeklyPlan(book, weekDates);
+      const todayPlan = plan.dailyPages[todayIdx] || 0;
+      const todayLog = await getDailyLog(book.id, today());
+      const completed = await getTotalCompleted(book.id);
+      const totalPct = book.totalPages > 0 ? Math.min(100, Math.round(completed / book.totalPages * 100)) : 0;
+
+      let bookWeekDone = 0;
+      for (const d of weekDates) {
+        const log = await getDailyLog(book.id, d);
+        if (log) bookWeekDone += (log.completedPages || 0);
+      }
+      weekDone += bookWeekDone;
+      weekGoal += plan.dailyPages.reduce((a, b) => a + b, 0);
+
+      if (todayPlan > 0) {
+        todayCount++;
+        todayPages += todayPlan;
+        if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) todayDoneCount++;
+      }
+
+      const statusBadge = todayPlan === 0
+        ? '<span class="badge badge-muted">휴식</span>'
+        : todayLog && todayLog.status === 'done'
+          ? '<span class="badge badge-success">완료</span>'
+          : todayLog && todayLog.status === 'partial'
+            ? '<span class="badge badge-accent">일부</span>'
+            : todayLog && todayLog.status === 'skip'
+              ? '<span class="badge badge-muted">미완</span>'
+              : '<span class="badge badge-primary">오늘</span>';
+
+      missionRows.push(`
+        <div class="list-item" onclick="location.href='mission.html?bookId=${book.id}'">
+          <div class="list-item-icon">${book.subject?.slice(0, 1) || '책'}</div>
+          <div class="list-item-body">
+            <div class="list-item-title">[${book.subject}] ${book.title}</div>
+            <div class="list-item-sub">${todayPlan > 0 ? `오늘 ${todayPlan}쪽 · 예상 ${Math.ceil(todayPlan * 5)}분` : '오늘은 쉬는 날'}</div>
+            <div class="mt-8">${statusBadge}</div>
+          </div>
+          <div class="list-item-arrow">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+      `);
+
+      progressRows.push(`
+        <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+          <div class="flex items-center justify-between mb-8">
+            <span class="text-sm font-semibold">[${book.subject}] ${book.title}</span>
+            <span class="text-sm font-bold text-primary">${totalPct}%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:${totalPct}%"></div>
+          </div>
+          <div class="progress-meta mt-4">
+            <span>${completed} / ${book.totalPages}쪽</span>
+            <span>${Math.max(0, diffDays(today(), book.targetEndDate))}일 남음</span>
+          </div>
+        </div>
+      `);
     }
+
+    document.getElementById('today-summary-title').textContent =
+      todayCount > 0 ? `${todayDoneCount}/${todayCount}개 미션 진행` : '오늘은 쉬는 날';
+    document.getElementById('today-summary-meta').textContent =
+      todayCount > 0 ? `총 ${todayPages}쪽 · 예상 ${Math.ceil(todayPages * 5)}분` : '내일 다시 작전을 이어가자';
+    document.getElementById('mission-list').innerHTML = missionRows.join('');
+    document.getElementById('book-progress-list').innerHTML = progressRows.join('');
     document.getElementById('week-done').textContent = weekDone;
+    document.getElementById('active-count').textContent = books.length;
     document.getElementById('week-pct').textContent =
       weekGoal > 0 ? Math.round(weekDone / weekGoal * 100) + '%' : '—';
 

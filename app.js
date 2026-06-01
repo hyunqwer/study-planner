@@ -185,6 +185,39 @@ async function getActiveBook() {
   return { id: doc.id, ...doc.data() };
 }
 
+async function getActiveBooks() {
+  const snap = await db.collection('users').doc(getUserId()).collection('books')
+    .where('status', '==', 'active').get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+function weekIndexForToday() {
+  const day = new Date().getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function buildWeeklyPlanFromBook(book, weekDates) {
+  const workDays = book.workDays || [1, 2, 4, 5];
+  const dailyPages = weekDates.map(dateStr => {
+    const dow = new Date(dateStr).getDay();
+    return workDays.includes(dow) ? (book.dailyPages || 5) : 0;
+  });
+  return {
+    weekStart: weekDates[0],
+    dailyPages,
+    weekGoal: dailyPages.reduce((sum, pages) => sum + pages, 0),
+  };
+}
+
+async function getOrCreateWeeklyPlan(book, weekDates) {
+  let plan = await getWeeklyPlan(book.id, weekDates[0]);
+  if (!plan) {
+    plan = buildWeeklyPlanFromBook(book, weekDates);
+    await saveWeeklyPlan(book.id, weekDates[0], plan);
+  }
+  return plan;
+}
+
 // ────────────────────────────────────────────
 // UI 헬퍼
 // ────────────────────────────────────────────
