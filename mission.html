@@ -239,6 +239,21 @@ function editTodayLog() {
   showEditForm(currentLog);
 }
 
+function showCompletedState(log) {
+  currentLog = log;
+  document.getElementById('mission-header').style.background = 'linear-gradient(135deg,#064e3b,#065f46)';
+  document.getElementById('mission-tag').textContent = '완료';
+  document.getElementById('mission-main-title').textContent = '기록 완료';
+  const pageInfo = log.startPage && log.endPage
+    ? `${log.startPage}~${log.endPage}쪽 (${log.completedPages}쪽)`
+    : `${log.completedPages}쪽`;
+  document.getElementById('mission-sub').textContent = pageInfo;
+  document.getElementById('action-section').style.display = 'none';
+  document.getElementById('rest-section').style.display = 'none';
+  document.getElementById('done-section').style.display = 'block';
+  document.getElementById('done-summary').textContent = `${pageInfo} 완료 · 수고했어`;
+}
+
 async function submitMission() {
   const startPage = parseInt(document.getElementById('start-page').value) || 0;
   const endPage   = parseInt(document.getElementById('end-page').value)   || 0;
@@ -247,24 +262,31 @@ async function submitMission() {
   }
   const completedPages = endPage - startPage + 1;
   const btn = document.getElementById('submit-btn');
+  const wasEditing = !!currentLog;
+  const nextLog = {
+    date: selectedDateStr,
+    status: completedPages >= todayPlannedPages ? 'done' : 'partial',
+    plannedPages: todayPlannedPages,
+    completedPages,
+    startPage,
+    endPage,
+    difficulty: selectedDifficulty,
+    reason: selectedReason,
+  };
   btn.disabled = true; btn.textContent = '저장 중...';
   try {
-    await saveDailyLog(currentBook.id, {
-      date: selectedDateStr,
-      status: completedPages >= todayPlannedPages ? 'done' : 'partial',
-      plannedPages: todayPlannedPages,
-      completedPages,
-      startPage,
-      endPage,
-      difficulty: selectedDifficulty,
-      reason: selectedReason,
-    });
-    showToast(currentLog ? '기록 수정 완료' : '기록 완료');
-    const nextUrl = currentLog ? `mission.html?bookId=${currentBook.id}&date=${selectedDateStr}` : 'index.html';
-    setTimeout(() => location.href = nextUrl, 1000);
+    await saveDailyLog(currentBook.id, nextLog);
+    showToast(wasEditing ? '기록 수정 완료' : '기록 완료');
+    if (wasEditing) {
+      btn.disabled = false;
+      btn.textContent = '수정 저장';
+      showCompletedState(nextLog);
+    } else {
+      location.href = 'index.html';
+    }
   } catch(e) {
     console.error(e); showToast('저장 실패');
-    btn.disabled = false; btn.textContent = currentLog ? '수정 저장' : '기록 저장';
+    btn.disabled = false; btn.textContent = wasEditing ? '수정 저장' : '기록 저장';
   }
 }
 
@@ -272,25 +294,33 @@ async function submitSkip() {
   document.getElementById('skip-card').style.display = 'block';
   // 이유 선택 후 저장
   if (!selectedReason) { showToast('못 한 이유를 선택해 줘'); return; }
+  const nextLog = {
+    date: selectedDateStr, status: 'skip',
+    plannedPages: todayPlannedPages, completedPages: 0,
+    reason: selectedReason,
+  };
   try {
-    await saveDailyLog(currentBook.id, {
-      date: selectedDateStr, status: 'skip',
-      plannedPages: todayPlannedPages, completedPages: 0,
-      reason: selectedReason,
-    });
+    await saveDailyLog(currentBook.id, nextLog);
     showToast('기록 완료');
-    setTimeout(() => location.href = 'index.html', 1000);
+    location.href = 'index.html';
   } catch(e) { console.error(e); showToast('저장 실패'); }
 }
 
 async function renderMissionList(books) {
   const weekDates = getThisWeekDates();
   const todayIdx = weekIndexForToday();
+  const todayStr = today();
   const rows = [];
-  for (const book of books) {
-    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+  const bookStates = await Promise.all(books.map(async book => {
+    const [plan, logs] = await Promise.all([
+      getOrCreateWeeklyPlan(book, weekDates),
+      getDailyLogsForDates(book.id, [todayStr]),
+    ]);
+    return { book, plan, log: logs[todayStr] };
+  }));
+
+  for (const { book, plan, log } of bookStates) {
     const planned = plan.dailyPages[todayIdx] || 0;
-    const log = await getDailyLog(book.id, today());
     const badge = planned === 0
       ? '<span class="badge badge-muted">휴식</span>'
       : log && log.status === 'done'
@@ -337,23 +367,21 @@ async function init() {
   currentBook = await getBook(bookId);
   if (!currentBook) { document.getElementById('mission-main-title').textContent = '진행 중인 책 없음'; return; }
 
+  const yesterday = new Date();
+  yesterday.setTime(new Date(selectedDateStr).getTime());
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
   const weekDates = getWeekDatesFor(selectedDateStr);
-  const plan = await getOrCreateWeeklyPlan(currentBook, weekDates);
+  const [plan, logs] = await Promise.all([
+    getOrCreateWeeklyPlan(currentBook, weekDates),
+    getDailyLogsForDates(currentBook.id, [selectedDateStr, yStr]),
+  ]);
   const adjustedIdx = weekIndexForDate(selectedDateStr);
   todayPlannedPages = plan ? (plan.dailyPages[adjustedIdx] || 0) : currentBook.dailyPages || 5;
 
-  const todayLog = await getDailyLog(currentBook.id, selectedDateStr);
+  const todayLog = logs[selectedDateStr];
   if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial')) {
-    currentLog = todayLog;
-    document.getElementById('mission-header').style.background = 'linear-gradient(135deg,#064e3b,#065f46)';
-    document.getElementById('mission-tag').textContent = '완료';
-    document.getElementById('mission-main-title').textContent = '기록 완료';
-    const pageInfo = todayLog.startPage && todayLog.endPage
-      ? `${todayLog.startPage}~${todayLog.endPage}쪽 (${todayLog.completedPages}쪽)`
-      : `${todayLog.completedPages}쪽`;
-    document.getElementById('mission-sub').textContent = pageInfo;
-    document.getElementById('done-section').style.display = 'block';
-    document.getElementById('done-summary').textContent = `${pageInfo} 완료 · 수고했어`;
+    showCompletedState(todayLog);
     return;
   }
 
@@ -372,11 +400,7 @@ async function init() {
   document.getElementById('action-section').style.display = 'block';
 
   // 이전 기록에서 끝 페이지 불러와 시작 페이지 자동 제안
-  const yesterday = new Date();
-  yesterday.setTime(new Date(selectedDateStr).getTime());
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
-  const prevLog = await getDailyLog(currentBook.id, yStr);
+  const prevLog = logs[yStr];
   if (prevLog && prevLog.endPage) {
     document.getElementById('start-page').value = prevLog.endPage + 1;
     document.getElementById('end-page').value   = prevLog.endPage + todayPlannedPages;

@@ -127,19 +127,18 @@ async function init() {
   if (!activeBooks.length) return;
 
   const weekDates = getThisWeekDates();
-  for (const book of activeBooks) {
-    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+  bookResults = await Promise.all(activeBooks.map(async book => {
+    const [plan, logs] = await Promise.all([
+      getOrCreateWeeklyPlan(book, weekDates),
+      getDailyLogsForDates(book.id, weekDates),
+    ]);
     const goal = plan.dailyPages.reduce((a,b)=>a+b,0);
-    let done = 0;
-    for (const d of weekDates) {
-      const log = await getDailyLog(book.id, d);
-      if (log) done += (log.completedPages||0);
-    }
+    const done = weekDates.reduce((sum, d) => sum + (logs[d]?.completedPages || 0), 0);
     const pct = goal>0 ? Math.round(done/goal*100) : 0;
-    bookResults.push({ book, goal, done, pct, plan });
-    weekGoal += goal;
-    weekDone += done;
-  }
+    return { book, goal, done, pct, plan };
+  }));
+  weekGoal = bookResults.reduce((sum, r) => sum + r.goal, 0);
+  weekDone = bookResults.reduce((sum, r) => sum + r.done, 0);
   weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
 
   document.getElementById('result-pct').textContent = weekPct + '%';
@@ -168,14 +167,14 @@ async function init() {
 
   document.getElementById('reason-step').style.display = 'block';
 
-  for (const book of activeBooks) {
-    const totalDone = await getTotalCompleted(book.id);
-    if (totalDone >= book.totalPages) {
+  Promise.all(activeBooks.map(book => getTotalCompleted(book.id))).then(totals => {
+    const completedIndex = totals.findIndex((totalDone, i) => totalDone >= activeBooks[i].totalPages);
+    if (completedIndex >= 0) {
+      const book = activeBooks[completedIndex];
       document.getElementById('completion-cta').style.display = 'block';
       document.querySelector('#completion-cta a').href = `report.html?bookId=${book.id}`;
-      break;
     }
-  }
+  }).catch(console.error);
 }
 
 function selectReason(el, val) {
@@ -220,7 +219,7 @@ async function submitReview() {
       }
     }
     showToast('주간 점검 완료');
-    setTimeout(() => location.href='index.html', 1200);
+    location.href='index.html';
   } catch(e) { console.error(e); showToast('저장 실패'); btn.disabled=false; btn.textContent='주간 점검 완료'; }
 }
 

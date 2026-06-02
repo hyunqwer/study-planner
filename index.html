@@ -227,6 +227,7 @@ async function loadHome() {
 
     const weekDates = getThisWeekDates();
     const todayIdx = weekIndexForToday();
+    const todayStr = today();
     const missionRows = [];
     const progressRows = [];
     const dayTotals = Array(7).fill(0);
@@ -235,24 +236,30 @@ async function loadHome() {
     let todayCount = 0, todayDoneCount = 0, todayPages = 0, todayDonePages = 0;
     let weekDone = 0, weekGoal = 0;
 
-    for (const book of books) {
-      const plan = await getOrCreateWeeklyPlan(book, weekDates);
+    const bookStates = await Promise.all(books.map(async book => {
+      const [plan, weekLogs, completed] = await Promise.all([
+        getOrCreateWeeklyPlan(book, weekDates),
+        getDailyLogsForDates(book.id, weekDates),
+        getTotalCompleted(book.id),
+      ]);
+      return { book, plan, weekLogs, todayLog: weekLogs[todayStr], completed };
+    }));
+
+    for (const { book, plan, weekLogs, todayLog, completed } of bookStates) {
       const todayPlan = plan.dailyPages[todayIdx] || 0;
-      const todayLog = await getDailyLog(book.id, today());
-      const completed = await getTotalCompleted(book.id);
       const totalPct = book.totalPages > 0 ? Math.min(100, Math.round(completed / book.totalPages * 100)) : 0;
       const bookWeekGoal = plan.dailyPages.reduce((a, b) => a + b, 0);
       plan.dailyPages.forEach((pages, i) => { dayTotals[i] += pages || 0; });
 
       const totalDays = Math.max(1, diffDays(book.startDate, book.targetEndDate));
-      const elapsedDays = Math.max(0, diffDays(book.startDate, today()));
+      const elapsedDays = Math.max(0, diffDays(book.startDate, todayStr));
       const expectedPages = Math.min(book.totalPages || 0, Math.floor((book.totalPages || 0) * elapsedDays / totalDays));
       const behind = expectedPages - completed;
       if (behind >= 8) behindBooks.push({ title: book.title, subject: book.subject, behind });
 
       let bookWeekDone = 0;
       for (const d of weekDates) {
-        const log = await getDailyLog(book.id, d);
+        const log = weekLogs[d];
         if (log) {
           bookWeekDone += (log.completedPages || 0);
           if ((log.completedPages || 0) > 0) studyDates.add(d);
@@ -305,7 +312,7 @@ async function loadHome() {
           </div>
           <div class="progress-meta mt-4">
             <span>${completed} / ${book.totalPages}쪽</span>
-            <span>${behind >= 8 ? `${behind}쪽 밀림` : `${Math.max(0, diffDays(today(), book.targetEndDate))}일 남음`}</span>
+            <span>${behind >= 8 ? `${behind}쪽 밀림` : `${Math.max(0, diffDays(todayStr, book.targetEndDate))}일 남음`}</span>
           </div>
         </div>
       `);

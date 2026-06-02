@@ -116,13 +116,13 @@ async function init() {
 
   weekDates = getThisWeekDates();
   weekStart = weekDates[0];
-  bookStates = [];
-  for (const book of activeBooks) {
-    const plan = await getOrCreateWeeklyPlan(book, weekDates);
-    const logs = {};
-    for (const d of weekDates) logs[d] = await getDailyLog(book.id, d);
-    bookStates.push({ book, plan, logs });
-  }
+  bookStates = await Promise.all(activeBooks.map(async book => {
+    const [plan, logs] = await Promise.all([
+      getOrCreateWeeklyPlan(book, weekDates),
+      getDailyLogsForDates(book.id, weekDates),
+    ]);
+    return { book, plan, logs };
+  }));
   renderTable(); renderSummary(); checkLoadSuggestions();
 }
 
@@ -236,13 +236,15 @@ function toggleEdit() {
 }
 
 async function savePlan() {
+  const saves = [];
   for (let bookIdx = 0; bookIdx < bookStates.length; bookIdx++) {
     const state = bookStates[bookIdx];
     const nextPages = weekDates.map((_, i) => parseInt(document.getElementById(`edit-${bookIdx}-${i}`).value)||0);
     state.plan.dailyPages = nextPages;
     state.plan.weekGoal = nextPages.reduce((a,b)=>a+b,0);
-    await saveWeeklyPlan(state.book.id, weekStart, state.plan);
+    saves.push(saveWeeklyPlan(state.book.id, weekStart, state.plan));
   }
+  await Promise.all(saves);
   showToast('저장 완료');
   isEditing = false;
   document.getElementById('edit-section').style.display = 'none';

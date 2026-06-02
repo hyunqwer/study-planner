@@ -109,10 +109,17 @@ async function init() {
   const bookSummaries = [];
   let weekGoal = 0, weekDone = 0, totalDoneAll = 0, totalPagesAll = 0, minDaysLeft = Infinity;
 
-  for (const book of books) {
-    const plan = await getOrCreateWeeklyPlan(book, weekDates);
+  const bookStates = await Promise.all(books.map(async book => {
+    const [plan, logs, totalDone] = await Promise.all([
+      getOrCreateWeeklyPlan(book, weekDates),
+      getDailyLogsForDates(book.id, weekDates),
+      getTotalCompleted(book.id),
+    ]);
+    return { book, plan, logs, totalDone };
+  }));
+
+  for (const { book, plan, logs, totalDone } of bookStates) {
     let bookWeekDone = 0;
-    const totalDone = await getTotalCompleted(book.id);
     totalDoneAll += totalDone;
     totalPagesAll += book.totalPages || 0;
     minDaysLeft = Math.min(minDaysLeft, Math.max(0, diffDays(today(), book.targetEndDate)));
@@ -124,7 +131,7 @@ async function init() {
     });
 
     for (let i=0; i<weekDates.length; i++) {
-      const log = await getDailyLog(book.id, weekDates[i]);
+      const log = logs[weekDates[i]];
       const done = log ? (log.completedPages||0) : 0;
       dayRows[i].done += done;
       bookWeekDone += done;

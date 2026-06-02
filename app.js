@@ -12,8 +12,10 @@ function requireAuth(callback) {
     location.href = 'auth.html';
   }, 5000);
 
-  auth.onAuthStateChanged(user => {
+  let unsubscribe = () => {};
+  unsubscribe = auth.onAuthStateChanged(user => {
     clearTimeout(timeout);
+    unsubscribe();
     if (!user) {
       location.href = 'auth.html';
       return;
@@ -147,6 +149,27 @@ async function getDailyLog(bookId, dateStr) {
     .collection('books').doc(bookId)
     .collection('dailyLogs').doc(dateStr).get();
   return doc.exists ? doc.data() : null;
+}
+
+// 여러 날짜의 일일 기록을 한 번에 조회
+async function getDailyLogsForDates(bookId, dateStrs) {
+  const dates = [...new Set((dateStrs || []).filter(Boolean))];
+  const logs = {};
+  dates.forEach(d => { logs[d] = null; });
+  if (!dates.length) return logs;
+
+  const ref = db.collection('users').doc(getUserId())
+    .collection('books').doc(bookId)
+    .collection('dailyLogs');
+  const chunks = [];
+  for (let i = 0; i < dates.length; i += 10) chunks.push(dates.slice(i, i + 10));
+  const snaps = await Promise.all(chunks.map(chunk =>
+    ref.where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get()
+  ));
+  snaps.forEach(snap => {
+    snap.docs.forEach(doc => { logs[doc.id] = doc.data(); });
+  });
+  return logs;
 }
 
 // 주간 계획 저장
