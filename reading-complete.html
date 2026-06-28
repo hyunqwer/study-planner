@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>완독 기록 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  .q-card { background:var(--surface-2); border-radius:var(--r); padding:18px; margin-bottom:14px; }
+  .q-num { font-size:11px; font-weight:800; color:var(--primary); letter-spacing:.06em;
+    text-transform:uppercase; margin-bottom:6px; }
+  .q-text { font-size:15px; font-weight:700; margin-bottom:12px; line-height:1.5; }
+  .q-input { width:100%; background:var(--surface-3); border:1.5px solid transparent;
+    border-radius:10px; padding:12px; font-size:14px; color:var(--text); resize:none;
+    font-family:inherit; line-height:1.6; transition:border-color .15s; box-sizing:border-box; }
+  .q-input:focus { outline:none; border-color:var(--primary); }
+  .q-hint { font-size:12px; color:var(--text-3); margin-top:6px; }
+  .book-banner { background:linear-gradient(135deg,var(--primary),#8b5cf6);
+    border-radius:var(--r); padding:16px; margin-bottom:20px; color:#fff; }
+</style>
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">완독 기록</span>
+</header>
+
+<main class="container">
+
+  <!-- 책 배너 -->
+  <div class="book-banner">
+    <div style="font-size:12px;opacity:.8;margin-bottom:4px">완독 축하해!</div>
+    <div style="font-size:18px;font-weight:800" id="book-title-banner">책 제목</div>
+    <div style="font-size:12px;opacity:.75;margin-top:4px">아래 3가지를 간단히 답해줘. AI 토론 재료가 돼</div>
+  </div>
+
+  <!-- Q1 -->
+  <div class="q-card">
+    <div class="q-num">Q1</div>
+    <div class="q-text">가장 기억에 남는 장면이나 내용은?</div>
+    <textarea class="q-input" id="q1" rows="3" placeholder="예: 어린 왕자가 장미꽃을 떠나는 장면이 마음에 남았어"></textarea>
+    <div class="q-hint">짧아도 괜찮아, 생각나는 대로 써봐</div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="q-card">
+    <div class="q-num">Q2</div>
+    <div class="q-text">웃기거나 신기했던, 혹은 이상하다고 느꼈던 부분은?</div>
+    <textarea class="q-input" id="q2" rows="3" placeholder="예: 어른들이 숫자만 좋아한다는 게 신기하고 웃겼어"></textarea>
+    <div class="q-hint">솔직하게 느낀 대로 써줘</div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="q-card">
+    <div class="q-num">Q3</div>
+    <div class="q-text">가장 마음에 든 인물은? 왜?</div>
+    <textarea class="q-input" id="q3" rows="3" placeholder="예: 여우. 길들인다는 게 뭔지 잘 설명해줘서"></textarea>
+    <div class="q-hint">싫었던 인물도 괜찮아</div>
+  </div>
+
+  <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px" onclick="startDiscussion()">
+    AI와 토론 시작하기 →
+  </button>
+
+  <p class="text-xs text-3" style="text-align:center;margin-top:12px">
+    입력한 내용이 AI 토론의 시작점이 돼요
+  </p>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const bookId = params.get('bookId');
+let book = null;
+
+async function init() {
+  if (!bookId) { location.href = 'reading.html'; return; }
+  book = await getReadingBook(bookId);
+  if (!book) { location.href = 'reading.html'; return; }
+  document.getElementById('book-title-banner').textContent = book.title;
+}
+
+async function startDiscussion() {
+  const q1 = document.getElementById('q1').value.trim();
+  const q2 = document.getElementById('q2').value.trim();
+  const q3 = document.getElementById('q3').value.trim();
+
+  if (!q1 || !q2 || !q3) {
+    alert('3가지 질문 모두 답해줘! 짧아도 괜찮아.');
+    return;
+  }
+
+  const btn = document.querySelector('.btn-primary');
+  btn.disabled = true; btn.textContent = '저장 중...';
+
+  try {
+    // 세션 생성
+    // 완독 상태로 업데이트 + 스트릭
+    await updateReadingBook(bookId, {
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      currentPage: book.totalPages || book.currentPage || 0,
+    });
+    await updateStreak();
+
+    const sessionId = await saveDiscussionSession(bookId, {
+      answers: { q1, q2, q3 },
+      messages: [],
+      bloomReached: 1,
+      completed: false,
+    });
+
+    location.href = `discussion.html?bookId=${bookId}&sessionId=${sessionId}`;
+  } catch(e) {
+    alert('오류: ' + e.message);
+    btn.disabled = false; btn.textContent = 'AI와 토론 시작하기 →';
+  }
+}
+
+requireAuth(() => init());
+</script>
+</body>
+</html>

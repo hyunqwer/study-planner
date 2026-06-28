@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>독서 토론 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  body { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+  .chat-header { flex-shrink:0; }
+  .bloom-bar { flex-shrink:0; padding:8px 16px; background:var(--surface-2);
+    border-bottom:1px solid var(--surface-3); display:flex; align-items:center; gap:8px; }
+  .bloom-step { flex:1; height:4px; border-radius:2px; background:var(--surface-3); transition:background .4s; }
+  .bloom-step.done { background:var(--primary); }
+  .bloom-label { font-size:11px; color:var(--text-3); font-weight:600; white-space:nowrap; }
+  .chat-body { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .msg { max-width:82%; display:flex; flex-direction:column; }
+  .msg.user { align-self:flex-end; align-items:flex-end; }
+  .msg.ai   { align-self:flex-start; align-items:flex-start; }
+  .bubble { padding:12px 14px; border-radius:18px; font-size:14px; line-height:1.6; }
+  .msg.user .bubble { background:var(--primary); color:#fff; border-bottom-right-radius:4px; }
+  .msg.ai   .bubble { background:var(--surface-2); color:var(--text); border-bottom-left-radius:4px; }
+  .msg-time { font-size:10px; color:var(--text-3); margin-top:3px; }
+  .typing { display:flex; gap:4px; align-items:center; padding:12px 14px; }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--text-3); animation:blink 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay:.2s; }
+  .dot:nth-child(3) { animation-delay:.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.3} 40%{opacity:1} }
+  .chat-input-area { flex-shrink:0; padding:12px 16px; background:var(--surface);
+    border-top:1px solid var(--surface-3); display:flex; gap:8px; align-items:flex-end; }
+  .chat-input { flex:1; background:var(--surface-2); border:1.5px solid var(--surface-3);
+    border-radius:20px; padding:10px 14px; font-size:14px; color:var(--text); resize:none;
+    font-family:inherit; line-height:1.5; max-height:100px; overflow-y:auto; }
+  .chat-input:focus { outline:none; border-color:var(--primary); }
+  .send-btn { width:40px; height:40px; border-radius:50%; background:var(--primary); border:none;
+    color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; transition:opacity .15s; }
+  .send-btn:disabled { opacity:.4; cursor:not-allowed; }
+  .mic-btn { width:40px; height:40px; border-radius:50%; border:2px solid var(--surface-3);
+    background:var(--surface-2); color:var(--text-3); font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; }
+  .mic-btn.recording { background:rgba(239,68,68,.15); border-color:#ef4444; color:#ef4444; }
+  .finish-bar { flex-shrink:0; padding:10px 16px; background:var(--surface-2);
+    border-top:1px solid var(--surface-3); display:flex; gap:8px; }
+  .bloom-badge { display:inline-flex; align-items:center; gap:4px; padding:4px 10px;
+    border-radius:99px; font-size:11px; font-weight:700; }
+  .bloom-1 { background:rgba(99,102,241,.12); color:var(--primary); }
+  .bloom-2 { background:rgba(245,158,11,.12); color:#f59e0b; }
+  .bloom-3 { background:rgba(34,197,94,.12); color:var(--success); }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="nav-bar chat-header" style="flex-shrink:0">
+  <button class="nav-back" onclick="confirmExit()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div style="text-align:center">
+    <div class="nav-title" id="header-title">독서 토론</div>
+    <div id="bloom-badge-header" class="bloom-badge bloom-1" style="margin:0 auto">1단계 · 회상</div>
+  </div>
+  <button onclick="finishDiscussion()" style="border:none;background:none;font-size:12px;
+    font-weight:700;color:var(--primary);cursor:pointer;font-family:inherit">완료</button>
+</header>
+
+<!-- 블룸 단계 바 -->
+<div class="bloom-bar">
+  <div class="bloom-step done" id="bloom-s1"></div>
+  <div class="bloom-step" id="bloom-s2"></div>
+  <div class="bloom-step" id="bloom-s3"></div>
+  <div class="bloom-label" id="bloom-label-bar">회상</div>
+</div>
+
+<!-- 채팅 본문 -->
+<div class="chat-body" id="chat-body"></div>
+
+<!-- 완료 버튼 (턴 6 이후 노출) -->
+<div class="finish-bar" id="finish-bar" style="display:none">
+  <button class="btn btn-success btn-lg" style="flex:1" onclick="finishDiscussion()">
+    토론 마치기 & 요약 받기
+  </button>
+</div>
+
+<!-- 입력창 -->
+<div class="chat-input-area">
+  <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="음성 입력">🎙️</button>
+  <textarea class="chat-input" id="chat-input" rows="1"
+    placeholder="생각을 써봐..." oninput="autoResize(this)"
+    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+  <button class="send-btn" id="send-btn" onclick="sendMessage()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+  </button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const FUNCTIONS_BASE = 'https://us-central1-selfstudy-planner.cloudfunctions.net';
+const params    = new URLSearchParams(location.search);
+const bookId    = params.get('bookId');
+const sessionId = params.get('sessionId');
+
+let book     = null;
+let answers  = {};
+let messages = [];   // { role, content }
+let isLoading = false;
+let bloomLevel = 1;
+let recognition = null;
+let isRecording = false;
+let synth = window.speechSynthesis;
+
+// ── 초기화 ────────────────────────────────────
+async function init() {
+  if (!bookId || !sessionId) { location.href = 'reading.html'; return; }
+  book = await getReadingBook(bookId);
+  if (!book) { location.href = 'reading.html'; return; }
+
+  document.getElementById('header-title').textContent = book.title;
+
+  // 세션에서 answers 로드
+  const uid = getUserId();
+  const sessSnap = await db.collection('users').doc(uid)
+    .collection('readingBooks').doc(bookId)
+    .collection('sessions').doc(sessionId).get();
+  if (sessSnap.exists) answers = sessSnap.data().answers || {};
+
+  // 첫 AI 메시지 요청
+  await requestAI();
+}
+
+// ── 메시지 렌더 ───────────────────────────────
+function renderMessage(role, content, bloom) {
+  const chatBody = document.getElementById('chat-body');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const now = new Date();
+  const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  let bloomHTML = '';
+  if (role === 'ai' && bloom) {
+    const labels = { 1:'💭 회상', 2:'🔍 분석', 3:'✨ 창의' };
+    const cls    = `bloom-${bloom}`;
+    bloomHTML = `<div class="bloom-badge ${cls}" style="margin-bottom:4px">${labels[bloom]}</div>`;
+  }
+
+  div.innerHTML = `
+    ${bloomHTML}
+    <div class="bubble">${content.replace(/\n/g,'<br>')}</div>
+    <div class="msg-time">${timeStr}</div>`;
+  chatBody.appendChild(div);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function showTyping() {
+  const chatBody = document.getElementById('chat-body');
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-indicator';
+  div.innerHTML = `<div class="bubble typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+  chatBody.appendChild(div);
+  chatBody.scrollTop = chatBody.scrollHeight;
+}
+
+function removeTyping() {
+  document.getElementById('typing-indicator')?.remove();
+}
+
+// ── 블룸 단계 UI 업데이트 ─────────────────────
+function updateBloomUI(level) {
+  bloomLevel = level;
+  const labels = { 1:'회상', 2:'분석', 3:'창의·적용' };
+  const badgeLabels = { 1:'1단계 · 회상', 2:'2단계 · 분석', 3:'3단계 · 창의' };
+  const badgeCls = { 1:'bloom-1', 2:'bloom-2', 3:'bloom-3' };
+
+  document.getElementById('bloom-label-bar').textContent = labels[level];
+  const badge = document.getElementById('bloom-badge-header');
+  badge.className = `bloom-badge ${badgeCls[level]}`;
+  badge.textContent = badgeLabels[level];
+
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`bloom-s${i}`).classList.toggle('done', i <= level);
+  }
+
+  // 6턴 이후 완료 버튼 노출
+  const userTurns = messages.filter(m => m.role === 'user').length;
+  if (userTurns >= 6) document.getElementById('finish-bar').style.display = 'flex';
+}
+
+// ── AI 요청 ───────────────────────────────────
+async function requestAI() {
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/discussBook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookTitle: book.title,
+        answers,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'AI 오류');
+
+    removeTyping();
+    messages.push({ role: 'assistant', content: data.reply });
+    renderMessage('ai', data.reply, data.bloomLevel);
+    updateBloomUI(data.bloomLevel);
+
+    // TTS
+    speak(data.reply);
+
+    // 세션 저장
+    await updateDiscussionSession(bookId, sessionId, {
+      messages: messages,
+      bloomReached: data.bloomLevel,
+    });
+
+  } catch(e) {
+    removeTyping();
+    renderMessage('ai', '잠깐, 다시 말해줄래? (오류: ' + e.message + ')');
+  }
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ── 메시지 전송 ───────────────────────────────
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  autoResize(input);
+  messages.push({ role: 'user', content: text });
+  renderMessage('user', text);
+
+  await requestAI();
+}
+
+// ── 음성 입력 (STT) ───────────────────────────
+function toggleMic() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('이 브라우저는 음성 입력을 지원하지 않아요. Chrome을 사용해봐.');
+    return;
+  }
+  if (isRecording) {
+    recognition?.stop();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'ko-KR';
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('mic-btn').classList.add('recording');
+    document.getElementById('mic-btn').textContent = '⏹️';
+  };
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById('chat-input').value = text;
+    autoResize(document.getElementById('chat-input'));
+  };
+  recognition.onend = () => {
+    isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').textContent = '🎙️';
+  };
+  recognition.onerror = () => recognition.stop();
+  recognition.start();
+}
+
+// ── TTS ───────────────────────────────────────
+function speak(text) {
+  if (!synth) return;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ko-KR';
+  utter.rate = 1.0;
+  utter.pitch = 1.1;
+  // 한국어 음성 우선 선택
+  const voices = synth.getVoices();
+  const koVoice = voices.find(v => v.lang.startsWith('ko'));
+  if (koVoice) utter.voice = koVoice;
+  synth.speak(utter);
+}
+
+// ── 토론 완료 ─────────────────────────────────
+async function finishDiscussion() {
+  if (messages.length < 2) {
+    alert('조금 더 대화해봐!');
+    return;
+  }
+  synth?.cancel();
+
+  const btn = document.querySelector('#finish-bar .btn-success');
+  if (btn) { btn.disabled = true; btn.textContent = '요약 생성 중...'; }
+
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/summarizeDiscussion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookTitle: book.title,
+        answers,
+        messages: messages.filter(m => m.role !== 'system'),
+      }),
+    });
+    const data = await res.json();
+
+    // 세션 업데이트
+    await updateDiscussionSession(bookId, sessionId, {
+      messages,
+      completed: true,
+      summary: data.summary || '',
+      bloomReached: data.bloomReached || bloomLevel,
+      coachingPoints: data.coachingPoints || [],
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 책 상태 → discussed
+    await updateReadingBook(bookId, { status: 'discussed' });
+
+    // 완료 페이지로
+    location.href = `reading.html?done=1`;
+
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '토론 마치기 & 요약 받기'; }
+    alert('요약 생성 실패: ' + e.message);
+  }
+}
+
+function confirmExit() {
+  synth?.cancel();
+  if (messages.length > 1 && !confirm('토론을 나가면 진행 내용이 저장돼요. 나갈까요?')) return;
+  location.href = 'reading.html';
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// 음성 목록 로드 후 초기화
+if (synth) {
+  synth.onvoiceschanged = () => {};
+}
+
+requireAuth(() => init());
+</script>
+</body>
+</html>

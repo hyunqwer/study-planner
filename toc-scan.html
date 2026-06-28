@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>목차로 교재 등록 — 작전노트</title>
-<link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
 <style>
   /* ── 업로드 존 ── */
   .upload-zone {
@@ -606,10 +612,27 @@ async function compressImageBlob(blob) {
     bestBlob = await canvasToBlob(canvas, 'image/jpeg', quality);
     bestWidth = width;
     bestHeight = height;
+
+    const done = bestBlob.size <= TARGET_IMAGE_BYTES;
+
+    // base64 변환을 canvas 초기화보다 먼저 수행
+    // (일부 모바일 브라우저에서 canvas를 초기화하면 blob이 무효화되는 버그 방지)
+    if (done) {
+      if (img.close) img.close();
+      canvas.width = 1;
+      canvas.height = 1;
+      return {
+        base64: await blobToBase64(bestBlob),
+        mimeType: 'image/jpeg',
+        size: bestBlob.size,
+        width: bestWidth,
+        height: bestHeight,
+      };
+    }
+
     canvas.width = 1;
     canvas.height = 1;
 
-    if (bestBlob.size <= TARGET_IMAGE_BYTES) break;
     if (quality > 0.64) quality -= 0.08;
     else if (maxDim > MIN_IMAGE_DIMENSION) maxDim = Math.round(maxDim * 0.85);
     else break;
@@ -617,6 +640,7 @@ async function compressImageBlob(blob) {
 
   if (img.close) img.close();
 
+  // 8회 시도 후에도 TARGET_IMAGE_BYTES 초과 시 마지막 blob 그대로 반환
   return {
     base64: await blobToBase64(bestBlob),
     mimeType: 'image/jpeg',

@@ -3,44 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>책장 — 작전노트</title>
-<link rel="stylesheet" href="style.css">
+<title>학습관리 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  .main-tab-row { display:flex; gap:0; margin-bottom:20px; border-bottom:2px solid var(--surface-3); }
+  .main-tab { flex:1; padding:10px 0; text-align:center; font-size:14px; font-weight:700;
+    color:var(--text-3); border:none; background:none; cursor:pointer; font-family:inherit;
+    border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s; }
+  .main-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+  .task-card { border:1.5px solid var(--surface-3); border-radius:var(--r);
+    padding:14px 16px; margin-bottom:10px; background:var(--surface-1); }
+  .task-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .task-card-name { font-size:15px; font-weight:700; }
+  .task-card-days { font-size:12px; color:var(--text-3); margin-top:4px; }
+  .task-card-actions { display:flex; gap:8px; margin-top:10px; }
+  .day-dot { display:inline-block; width:22px; height:22px; border-radius:50%;
+    font-size:11px; font-weight:700; text-align:center; line-height:22px;
+    margin-right:3px; }
+  .day-dot.on { background:var(--primary); color:#fff; }
+  .day-dot.off { background:var(--surface-3); color:var(--text-3); }
+</style>
 </head>
 <body>
 
-<header class="nav-bar">
-  <button class="nav-back" onclick="history.back()">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-  </button>
-  <span class="nav-title">책장</span>
+<header class="nav-bar" style="justify-content:space-between">
+  <span class="nav-title" style="font-size:17px;font-weight:800">학습관리</span>
 </header>
 
 <main class="container">
 
-  <div class="flex items-center justify-between mb-16">
-    <div></div>
-    <a href="register.html" class="btn btn-primary btn-sm">+ 새 책</a>
+  <!-- 탭: 교재 / 과제 -->
+  <div class="main-tab-row">
+    <button class="main-tab active" id="tab-books" onclick="switchTab('books')">📚 교재</button>
+    <button class="main-tab" id="tab-tasks" onclick="switchTab('tasks')">📋 과제</button>
   </div>
 
-  <!-- 필터 탭 -->
-  <div class="chip-group mb-16">
-    <button class="chip selected" onclick="filter(this,'all')">전체</button>
-    <button class="chip" onclick="filter(this,'active')">진행 중</button>
-    <button class="chip" onclick="filter(this,'completed')">완주</button>
-    <button class="chip" onclick="filter(this,'paused')">보류</button>
-  </div>
-
-  <div id="loading-msg" style="text-align:center;padding:40px 0;color:var(--text-3)">
-    <p class="text-sm">불러오는 중</p>
-  </div>
-
-  <div id="book-list"></div>
-
-  <div id="empty-msg" style="display:none;text-align:center;padding:48px 0">
-    <div style="width:48px;height:48px;border-radius:var(--r);background:var(--surface-3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+  <!-- ── 교재 탭 ── -->
+  <div id="section-books">
+    <div class="flex items-center justify-between mb-16">
+      <div class="chip-group" style="margin-bottom:0">
+        <button class="chip selected" onclick="filterBook(this,'all')">전체</button>
+        <button class="chip" onclick="filterBook(this,'active')">진행 중</button>
+        <button class="chip" onclick="filterBook(this,'completed')">완주</button>
+        <button class="chip" onclick="filterBook(this,'paused')">보류</button>
+      </div>
+      <a href="register.html" class="btn btn-primary btn-sm">+ 교재</a>
     </div>
-    <p class="text-sm text-2">책이 없어요</p>
+
+    <div id="loading-books" style="text-align:center;padding:40px 0;color:var(--text-3)">
+      <p class="text-sm">불러오는 중</p>
+    </div>
+    <div id="book-list"></div>
+    <div id="empty-books" style="display:none;text-align:center;padding:48px 0">
+      <p style="font-size:28px;margin-bottom:8px">📚</p>
+      <p class="text-sm text-2">등록된 교재가 없어요</p>
+      <a href="register.html" class="btn btn-primary btn-sm mt-8">교재 등록하기</a>
+    </div>
+  </div>
+
+  <!-- ── 과제 탭 ── -->
+  <div id="section-tasks" style="display:none">
+    <div class="flex items-center justify-between mb-16">
+      <span class="text-sm text-2">등록된 과제 목록</span>
+      <a href="task-register.html" class="btn btn-primary btn-sm">+ 과제</a>
+    </div>
+
+    <div id="loading-tasks" style="text-align:center;padding:40px 0;color:var(--text-3)">
+      <p class="text-sm">불러오는 중</p>
+    </div>
+    <div id="task-list"></div>
+    <div id="empty-tasks" style="display:none;text-align:center;padding:48px 0">
+      <p style="font-size:28px;margin-bottom:8px">📋</p>
+      <p class="text-sm text-2">등록된 과제가 없어요</p>
+      <a href="task-register.html" class="btn btn-primary btn-sm mt-8">과제 등록하기</a>
+    </div>
   </div>
 
 </main>
@@ -48,9 +90,10 @@
 <nav class="bottom-nav">
   <a href="index.html" data-page="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</a>
   <a href="mission.html" data-page="mission"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션</a>
+  <a href="reading.html" data-page="reading"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>독서</a>
   <a href="weekly.html" data-page="weekly"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표</a>
   <a href="review.html" data-page="review"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검</a>
-  <a href="bookshelf.html" data-page="books" class="active"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장</a>
+  <a href="bookshelf.html" data-page="books"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>학습관리</a>
 </nav>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -59,40 +102,60 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
+// 월~일 순서 (task-register, weekly와 동일)
+// JS getDay() 값: 월=1, 화=2, 수=3, 목=4, 금=5, 토=6, 일=0
+const DAY_LABELS = ['월','화','수','목','금','토','일'];
+const DAY_NUMS   = [  1,   2,   3,   4,   5,   6,   0];
 const STATUS_BADGE = {
-  active: '<span class="badge badge-primary">진행 중</span>',
+  active:    '<span class="badge badge-primary">진행 중</span>',
   completed: '<span class="badge badge-success">완주</span>',
-  paused: '<span class="badge badge-muted">보류</span>',
+  paused:    '<span class="badge badge-muted">보류</span>',
 };
+const TYPE_LABEL = { homework:'📋 주간 숙제', lesson:'🎬 강의/학습앱' };
 
-let allBooks = [], currentFilter = 'all';
+let allBooks = [], allTasks = [], currentBookFilter = 'all';
+let booksLoaded = false, tasksLoaded = false;
 
 async function init() {
   allBooks = await getBooks();
-  document.getElementById('loading-msg').style.display = 'none';
-  render();
+  booksLoaded = true;
+  document.getElementById('loading-books').style.display = 'none';
+  renderBooks();
 }
 
-function filter(el, f) {
-  document.querySelectorAll('.chip-group .chip').forEach(c => c.classList.remove('selected'));
+async function loadTasks() {
+  if (tasksLoaded) return;
+  allTasks = await getTasks();
+  tasksLoaded = true;
+  document.getElementById('loading-tasks').style.display = 'none';
+  renderTasks();
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-books').classList.toggle('active', tab === 'books');
+  document.getElementById('tab-tasks').classList.toggle('active', tab === 'tasks');
+  document.getElementById('section-books').style.display = tab === 'books' ? 'block' : 'none';
+  document.getElementById('section-tasks').style.display = tab === 'tasks' ? 'block' : 'none';
+  if (tab === 'tasks') loadTasks();
+}
+
+function filterBook(el, f) {
+  document.querySelectorAll('#section-books .chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
-  currentFilter = f;
-  render();
+  currentBookFilter = f;
+  renderBooks();
 }
 
-function render() {
-  const filtered = currentFilter === 'all' ? allBooks : allBooks.filter(b => b.status === currentFilter);
+function renderBooks() {
+  const filtered = currentBookFilter === 'all' ? allBooks : allBooks.filter(b => b.status === currentBookFilter);
   const list = document.getElementById('book-list');
-  const empty = document.getElementById('empty-msg');
-
+  const empty = document.getElementById('empty-books');
   if (!filtered.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
-
   list.innerHTML = filtered.map(book => {
     const sub = book.status === 'active'
       ? `목표일까지 ${Math.max(0, diffDays(today(), book.targetEndDate))}일 · 하루 ${book.dailyPages}쪽`
       : `${formatDate(book.startDate)} — ${formatDate(book.targetEndDate)}`;
-
     return `
       <div class="list-item" onclick="location.href='mission.html?bookId=${book.id}'">
         <div class="list-item-icon">
@@ -103,15 +166,55 @@ function render() {
           <div class="list-item-sub">[${book.subject}] ${sub}</div>
           <div class="mt-8">${STATUS_BADGE[book.status] || ''}</div>
         </div>
-        <div class="list-item-arrow">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-      </div>
-    `;
+        <div class="list-item-arrow"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>`;
   }).join('');
 }
 
-requireAuth(() => init());
+function renderTasks() {
+  const list = document.getElementById('task-list');
+  const empty = document.getElementById('empty-tasks');
+  if (!allTasks.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = allTasks.map(task => {
+    const dayDots = DAY_LABELS.map((l, i) => {
+      const on = (task.days || []).includes(DAY_NUMS[i]);
+      return `<span class="day-dot ${on ? 'on' : 'off'}">${l}</span>`;
+    }).join('');
+    const subInfo = task.subItems?.length
+      ? `<div class="text-xs text-3 mt-4">세부: ${task.subItems.join(', ')}</div>` : '';
+    return `
+      <div class="task-card">
+        <div class="task-card-header">
+          <div>
+            <div class="task-card-name">${task.name}</div>
+            <div class="text-xs text-3 mt-4">${TYPE_LABEL[task.type] || task.type}</div>
+            ${subInfo}
+          </div>
+        </div>
+        <div class="mt-8">${dayDots}</div>
+        <div class="task-card-actions">
+          <button class="btn btn-ghost btn-sm" onclick="deleteTaskItem('${task.id}')">삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function deleteTaskItem(taskId) {
+  if (!confirm('이 과제를 삭제할까요?')) return;
+  await deleteTask(taskId);
+  allTasks = allTasks.filter(t => t.id !== taskId);
+  renderTasks();
+  showToast('삭제됐어요');
+}
+
+requireAuth(() => {
+  init();
+  // task-register에서 돌아오면 과제 탭 자동 열기
+  if (new URLSearchParams(location.search).get('tab') === 'tasks') {
+    setTimeout(() => switchTab('tasks'), 100);
+  }
+});
 setActiveNav('books');
 </script>
 </body>

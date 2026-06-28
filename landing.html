@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>작전노트 — 나만의 공부 작전</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --success: #22c55e;
+    --accent: #f59e0b;
+    --danger: #ef4444;
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #273548;
+    --text: #f1f5f9;
+    --text-2: #94a3b8;
+    --text-3: #64748b;
+  }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 슬라이드 컨테이너 ── */
+  .slides-wrap {
+    display: flex;
+    width: 500%;
+    height: 100%;
+    transition: transform .45s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+  }
+  .slide {
+    width: 20%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 28px 120px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── 배경 그라디언트 (슬라이드별) ── */
+  .slide-1 { background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%); }
+  .slide-2 { background: linear-gradient(160deg, #0f172a 0%, #1a2744 100%); }
+  .slide-3 { background: linear-gradient(160deg, #0f172a 0%, #14281e 100%); }
+  .slide-4 { background: linear-gradient(160deg, #0f172a 0%, #2a1a14 100%); }
+  .slide-5 { background: linear-gradient(160deg, #1e1b4b 0%, #0f172a 100%); }
+
+  /* ── 건너뛰기 ── */
+  .skip-btn {
+    position: fixed; top: 20px; right: 20px; z-index: 100;
+    background: rgba(255,255,255,.1);
+    border: none; color: var(--text-2);
+    font-size: 13px; font-weight: 600;
+    padding: 6px 14px; border-radius: 99px; cursor: pointer;
+    transition: background .15s;
+    font-family: inherit;
+  }
+  .skip-btn:hover { background: rgba(255,255,255,.18); }
+  #skip-btn-wrap { display: block; }
+
+  /* ── 인디케이터 ── */
+  .indicator {
+    position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 100;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 99px;
+    background: var(--text-3);
+    transition: width .3s, background .3s;
+    cursor: pointer;
+  }
+  .dot.active { width: 22px; background: var(--primary-light); }
+
+  /* ── 하단 버튼 ── */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    padding: 0 24px 28px;
+    background: linear-gradient(to top, rgba(15,23,42,1) 70%, transparent);
+  }
+  .btn-next {
+    width: 100%; max-width: 440px; display: block; margin: 0 auto;
+    padding: 16px; border-radius: 16px;
+    border: none; cursor: pointer; font-family: inherit;
+    font-size: 16px; font-weight: 700; letter-spacing: -.2px;
+    background: var(--primary); color: #fff;
+    transition: opacity .15s, transform .1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-next:active { opacity: .85; transform: scale(.98); }
+  .btn-next.cta    { background: linear-gradient(135deg, var(--primary), #8b5cf6); font-size: 17px; }
+
+  /* ── 일러스트 영역 ── */
+  .illust { margin-bottom: 32px; position: relative; }
+
+  /* 슬라이드 1 일러스트 */
+  .desk-scene {
+    width: 200px; height: 160px; position: relative; margin: 0 auto;
+  }
+  .desk { position: absolute; bottom: 0; left: 10px; right: 10px; height: 12px; background: #334155; border-radius: 4px; }
+  .book-stack {
+    position: absolute; bottom: 12px; left: 30px;
+    display: flex; flex-direction: column-reverse; gap: 4px;
+  }
+  .bk {
+    height: 22px; border-radius: 3px;
+    animation: bookWobble 3s ease-in-out infinite;
+  }
+  .bk:nth-child(1) { width: 80px; background: #6366f1; animation-delay: 0s; }
+  .bk:nth-child(2) { width: 70px; background: #f59e0b; animation-delay: .3s; }
+  .bk:nth-child(3) { width: 90px; background: #22c55e; animation-delay: .6s; }
+  @keyframes bookWobble {
+    0%,100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+  .emoji-face {
+    position: absolute; bottom: 48px; right: 20px;
+    font-size: 48px;
+    animation: faceFloat 2.5s ease-in-out infinite;
+  }
+  @keyframes faceFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .thought-bubble {
+    position: absolute; top: 0; right: 0;
+    background: var(--surface); border-radius: 12px; padding: 8px 12px;
+    font-size: 12px; color: var(--text-2); white-space: nowrap;
+    animation: fadeInOut 2.5s ease-in-out infinite;
+  }
+  .thought-bubble::after {
+    content: ''; position: absolute; bottom: -8px; right: 16px;
+    border: 5px solid transparent; border-top-color: var(--surface);
+  }
+  @keyframes fadeInOut {
+    0%,100% { opacity: .4; } 50% { opacity: 1; }
+  }
+
+  /* 슬라이드 2 일러스트 */
+  .vs-scene {
+    display: flex; align-items: center; gap: 24px;
+  }
+  .vs-box {
+    text-align: center; padding: 16px 18px; border-radius: 16px;
+  }
+  .vs-box.bad  { background: rgba(239,68,68,.15); border: 1.5px solid rgba(239,68,68,.3); }
+  .vs-box.good { background: rgba(99,102,241,.15); border: 1.5px solid rgba(99,102,241,.4); }
+  .vs-icon { font-size: 32px; margin-bottom: 6px; }
+  .vs-label { font-size: 11px; color: var(--text-2); line-height: 1.4; }
+  .vs-sep { font-size: 18px; font-weight: 800; color: var(--text-3); }
+
+  /* 슬라이드 3 일러스트 */
+  .scan-flow {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .scan-box {
+    text-align: center; padding: 12px 10px; border-radius: 14px;
+    background: var(--surface); min-width: 72px;
+  }
+  .scan-icon { font-size: 28px; margin-bottom: 4px; }
+  .scan-label { font-size: 10px; color: var(--text-2); }
+  .scan-arrow { font-size: 18px; color: var(--primary-light); }
+  .scan-box.highlight { background: rgba(99,102,241,.2); border: 1.5px solid var(--primary); }
+
+  /* 슬라이드 4 일러스트 */
+  .meeting-scene { width: 220px; margin: 0 auto; }
+  .meeting-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border-radius: 12px; padding: 10px 14px;
+    margin-bottom: 8px;
+    animation: slideIn .5s ease both;
+  }
+  .meeting-row:nth-child(1) { animation-delay: 0s; }
+  .meeting-row:nth-child(2) { animation-delay: .15s; }
+  .meeting-row:nth-child(3) { animation-delay: .3s; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-16px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .meeting-label { font-size: 12px; flex: 1; color: var(--text-2); }
+  .meeting-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+  }
+  .badge-up   { background: rgba(34,197,94,.2);  color: #86efac; }
+  .badge-keep { background: rgba(99,102,241,.2); color: #a5b4fc; }
+  .badge-down { background: rgba(239,68,68,.2);  color: #fca5a5; }
+
+  /* ── 텍스트 ── */
+  .slide-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    color: var(--primary-light); margin-bottom: 12px; text-transform: uppercase;
+  }
+  .slide-title {
+    font-size: 26px; font-weight: 800; letter-spacing: -.5px;
+    line-height: 1.25; text-align: center; margin-bottom: 14px;
+    word-break: keep-all;
+  }
+  .slide-title .hi  { color: var(--primary-light); }
+  .slide-title .ok  { color: var(--success); }
+  .slide-title .warn{ color: var(--accent); }
+  .slide-desc {
+    font-size: 14px; color: var(--text-2); line-height: 1.7;
+    text-align: center; max-width: 320px; word-break: keep-all;
+  }
+
+  /* ── 슬라이드 5 CTA ── */
+  .logo-big {
+    font-size: 42px; font-weight: 900; letter-spacing: -1px; margin-bottom: 6px;
+  }
+  .logo-big span { color: var(--primary-light); }
+  .feature-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 18px 0 28px; }
+  .pill {
+    font-size: 12px; font-weight: 600; padding: 5px 12px;
+    border-radius: 99px; background: var(--surface);
+    color: var(--text-2);
+  }
+  .btn-secondary {
+    display: block; text-align: center;
+    width: 100%; max-width: 440px; margin: 10px auto 0;
+    padding: 13px; border-radius: 14px;
+    border: 1.5px solid rgba(255,255,255,.15);
+    color: var(--text-2); font-size: 14px; font-weight: 600;
+    text-decoration: none; cursor: pointer; background: transparent;
+    font-family: inherit;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-secondary:hover { border-color: rgba(255,255,255,.3); color: var(--text); }
+  .existing-login {
+    text-align: center; margin-top: 14px;
+    font-size: 12px; color: var(--text-3);
+  }
+  .existing-login a { color: var(--text-2); text-decoration: underline; }
+
+  /* ── 터치 스와이프 힌트 ── */
+  .swipe-hint {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px;
+    animation: hintFade 3s ease 1.5s both;
+    pointer-events: none;
+  }
+  @keyframes hintFade {
+    0%   { opacity: 0; } 20% { opacity: 1; }
+    80%  { opacity: 1; } 100%{ opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 건너뛰기 -->
+<div id="skip-btn-wrap">
+  <button class="skip-btn" onclick="goToAuth()">건너뛰기</button>
+</div>
+
+<!-- 스와이프 힌트 (첫 슬라이드에만) -->
+<div class="swipe-hint" id="swipe-hint">
+  ← 옆으로 밀어봐
+</div>
+
+<!-- 슬라이드 -->
+<div class="slides-wrap" id="slides-wrap">
+
+  <!-- ── SLIDE 1: 공감 훅 ── -->
+  <div class="slide slide-1">
+    <div class="illust">
+      <div class="desk-scene">
+        <div class="thought-bubble">또 미뤘다... 😅</div>
+        <div class="emoji-face">😓</div>
+        <div class="book-stack">
+          <div class="bk"></div>
+          <div class="bk"></div>
+          <div class="bk"></div>
+        </div>
+        <div class="desk"></div>
+      </div>
+    </div>
+    <div class="slide-tag">📖 이런 적 있어?</div>
+    <h1 class="slide-title">공부 계획 세우고<br><span class="warn">3일 만에 포기</span>한 적 있어?</h1>
+    <p class="slide-desc">의지가 부족한 게 아니야.<br>계획이 나한테 안 맞았던 거야.</p>
+  </div>
+
+  <!-- ── SLIDE 2: 핵심 가치 ── -->
+  <div class="slide slide-2">
+    <div class="illust">
+      <div class="vs-scene">
+        <div class="vs-box bad">
+          <div class="vs-icon">👀</div>
+          <div class="vs-label">감시받는<br>공부</div>
+        </div>
+        <div class="vs-sep">VS</div>
+        <div class="vs-box good">
+          <div class="vs-icon">🎯</div>
+          <div class="vs-label">내가 결정하는<br>공부</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-tag">⚔️ 작전노트 방식</div>
+    <h1 class="slide-title"><span class="hi">스스로</span> 계획하고<br><span class="hi">스스로</span> 조정해</h1>
+    <p class="slide-desc">부모님이 시켜서가 아니라,<br>내가 원하는 목표를 내가 설계하는 거야.<br>작전노트는 그걸 도와줘.</p>
+  </div>
+
+  <!-- ── SLIDE 3: 기능 — 목차 스캔 ── -->
+  <div class="slide slide-3">
+    <div class="illust">
+      <div class="scan-flow">
+        <div class="scan-box">
+          <div class="scan-icon">📸</div>
+          <div class="scan-label">목차 사진</div>
+        </div>
+        <div class="scan-arrow">→</div>
+        <div class="scan-box highlight">
+          <div class="scan-icon">🤖</div>
+          <div class="scan-label">AI 인식</div>
+        </div>
+        <div class="scan-arrow">→</div>
+        <div class="scan-box">
+          <div class="scan-icon">📅</div>
+          <div class="scan-label">계획 완성</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-tag">📸 기능 1</div>
+    <h1 class="slide-title">목차 사진 한 장으로<br><span class="ok">계획 자동 완성</span></h1>
+    <p class="slide-desc">폰으로 목차를 찍으면<br>AI가 단원별 시작 페이지를 읽고<br>주간 학습 계획을 자동으로 짜줘.</p>
+  </div>
+
+  <!-- ── SLIDE 4: 기능 — 작전회의 ── -->
+  <div class="slide slide-4">
+    <div class="illust">
+      <div class="meeting-scene">
+        <div class="meeting-row">
+          <div class="meeting-label">📘 수학 (이번주 95%)</div>
+          <div class="meeting-badge badge-up">목표 상향 📈</div>
+        </div>
+        <div class="meeting-row">
+          <div class="meeting-label">📗 영어 (이번주 80%)</div>
+          <div class="meeting-badge badge-keep">유지 ✅</div>
+        </div>
+        <div class="meeting-row">
+          <div class="meeting-label">📙 국어 (이번주 40%)</div>
+          <div class="meeting-badge badge-down">분량 조정 📉</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-tag">⚡ 기능 2</div>
+    <h1 class="slide-title">매주 AI랑<br><span class="warn">작전회의</span>해</h1>
+    <p class="slide-desc">한 주가 끝나면 달성률을 분석해서<br>너무 쉬우면 목표를 올리고,<br>힘들었으면 분량을 줄여줘.<br>부모님·선생님과 결과 공유도 돼.</p>
+  </div>
+
+  <!-- ── SLIDE 5: CTA ── -->
+  <div class="slide slide-5" id="slide-cta">
+    <div class="logo-big">작전<span>노트</span></div>
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:4px">나만의 공부 작전을 시작해봐</p>
+    <div class="feature-pills">
+      <span class="pill">📸 목차 스캔</span>
+      <span class="pill">📅 주간 계획</span>
+      <span class="pill">🤖 AI 작전회의</span>
+      <span class="pill">⚔️ 자기주도</span>
+    </div>
+    <p style="font-size:12px;color:var(--text-3);margin-bottom:0">무료로 시작해. 계정만 만들면 돼.</p>
+  </div>
+
+</div><!-- /slides-wrap -->
+
+<!-- 인디케이터 -->
+<div class="indicator" id="indicator">
+  <div class="dot active" onclick="goTo(0)"></div>
+  <div class="dot" onclick="goTo(1)"></div>
+  <div class="dot" onclick="goTo(2)"></div>
+  <div class="dot" onclick="goTo(3)"></div>
+  <div class="dot" onclick="goTo(4)"></div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class="bottom-bar">
+  <button class="btn-next" id="btn-next" onclick="handleNext()">다음</button>
+  <!-- 슬라이드 5 전용 버튼들 (hidden) -->
+  <div id="cta-buttons" style="display:none">
+    <button class="btn-next cta" onclick="goToSignup()">지금 바로 시작하기 →</button>
+    <div class="existing-login">
+      이미 계정이 있어? <a href="auth.html" onclick="markOnboarded()">로그인하기</a>
+    </div>
+  </div>
+</div>
+
+<script>
+let current = 0;
+const total = 5;
+let startX = 0, isDragging = false;
+
+const wrap      = document.getElementById('slides-wrap');
+const dots      = document.querySelectorAll('.dot');
+const btnNext   = document.getElementById('btn-next');
+const ctaBtns   = document.getElementById('cta-buttons');
+const skipWrap  = document.getElementById('skip-btn-wrap');
+const swipeHint = document.getElementById('swipe-hint');
+
+function goTo(idx) {
+  current = Math.max(0, Math.min(total - 1, idx));
+  wrap.style.transform = `translateX(-${current * 20}%)`;
+  dots.forEach((d, i) => d.classList.toggle('active', i === current));
+
+  const isLast = current === total - 1;
+  btnNext.style.display   = isLast ? 'none' : 'block';
+  ctaBtns.style.display   = isLast ? 'block' : 'none';
+  skipWrap.style.display  = isLast ? 'none' : 'block';
+  swipeHint.style.display = 'none'; // 한 번 넘기면 숨김
+
+  btnNext.textContent = current === total - 2 ? '마지막으로 →' : '다음';
+}
+
+function handleNext() {
+  if (current < total - 1) goTo(current + 1);
+}
+
+function goToAuth() {
+  markOnboarded();
+  location.href = 'auth.html';
+}
+
+function goToSignup() {
+  markOnboarded();
+  location.href = 'auth.html?tab=signup';
+}
+
+function markOnboarded() {
+  try { localStorage.setItem('onboarded', '1'); } catch {}
+}
+
+// ── 터치 스와이프 ──
+wrap.addEventListener('touchstart', e => {
+  startX    = e.touches[0].clientX;
+  isDragging = true;
+}, { passive: true });
+
+wrap.addEventListener('touchend', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  const diff = startX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) < 40) return;
+  if (diff > 0 && current < total - 1) goTo(current + 1);
+  else if (diff < 0 && current > 0)    goTo(current - 1);
+});
+
+// ── 마우스 드래그 (PC 테스트용) ──
+wrap.addEventListener('mousedown', e => { startX = e.clientX; isDragging = true; });
+wrap.addEventListener('mouseup',   e => {
+  if (!isDragging) return;
+  isDragging = false;
+  const diff = startX - e.clientX;
+  if (Math.abs(diff) < 40) return;
+  if (diff > 0 && current < total - 1) goTo(current + 1);
+  else if (diff < 0 && current > 0)    goTo(current - 1);
+});
+
+// ── 키보드 ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') handleNext();
+  if (e.key === 'ArrowLeft' && current > 0) goTo(current - 1);
+});
+
+// ── 이미 온보딩 완료한 사람은 바로 auth로 ──
+try {
+  if (localStorage.getItem('onboarded')) location.replace('auth.html');
+} catch {}
+</script>
+</body>
+</html>

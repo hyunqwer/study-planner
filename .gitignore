@@ -9,3 +9,5 @@ functions/.env.*
 .env.*
 firebase-debug.log
 *.log
+.fuse_hidden*
+renametest_b

@@ -2,14 +2,93 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 로그인한 사용자는 자기 데이터만 읽고 쓸 수 있음
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // accepted 연결 확인 함수
+    function hasAcceptedLink(mentorUid, menteeUid) {
+      return exists(/databases/$(database)/documents/connections/$(mentorUid + '_' + menteeUid))
+        && get(/databases/$(database)/documents/connections/$(mentorUid + '_' + menteeUid)).data.status == 'accepted';
     }
 
-    // 그 외 모든 경로 차단
-    match /{document=**} {
-      allow read, write: if false;
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    // ── users ──────────────────────────────────────────────
+    match /users/{uid} {
+      allow read, write: if request.auth.uid == uid;
+      // 멘토가 멘티 프로필 읽기 허용
+      allow read: if isLoggedIn();
+
+      // 모든 서브컬렉션 — 본인 read/write
+      match /{subcollection=**} {
+        allow read, write: if request.auth.uid == uid;
+      }
+
+      // 멘티의 books 컬렉션
+      match /books/{bookId} {
+        allow read, write: if request.auth.uid == uid;
+        // 멘토가 읽기 허용 (accepted 연결 있을 때)
+        allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+
+        match /dailyLogs/{logId} {
+          allow read, write: if request.auth.uid == uid;
+          allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+        }
+
+        match /weeklyPlans/{planId} {
+          allow read, write: if request.auth.uid == uid;
+          allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+        }
+      }
+
+      // 독서 books 컬렉션
+      match /readingBooks/{bookId} {
+        allow read, write: if request.auth.uid == uid;
+        allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+
+        match /dailyLogs/{logId} {
+          allow read, write: if request.auth.uid == uid;
+          allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+        }
+      }
+
+      // 과제 (tasks / taskLogs)
+      match /tasks/{taskId} {
+        allow read, write: if request.auth.uid == uid;
+        allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+      }
+
+      match /taskLogs/{logId} {
+        allow read, write: if request.auth.uid == uid;
+        allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+      }
+
+      // discussion sessions
+      match /discussionSessions/{sessionId} {
+        allow read, write: if request.auth.uid == uid;
+        allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+
+        match /messages/{msgId} {
+          allow read, write: if request.auth.uid == uid;
+          allow read: if isLoggedIn() && hasAcceptedLink(request.auth.uid, uid);
+        }
+      }
+    }
+
+    // ── connections ────────────────────────────────────────
+    match /connections/{connId} {
+      // 본인이 연결된 경우 (멘토 or 멘티) 읽기 허용
+      allow read: if isLoggedIn()
+        && (resource.data.mentorUid == request.auth.uid
+            || resource.data.menteeUid == request.auth.uid);
+
+      // 멘티가 요청 생성
+      allow create: if isLoggedIn()
+        && request.resource.data.menteeUid == request.auth.uid;
+
+      // 멘토 또는 멘티가 수정 (수락/거절/해제)
+      allow update, delete: if isLoggedIn()
+        && (resource.data.mentorUid == request.auth.uid
+            || resource.data.menteeUid == request.auth.uid);
     }
   }
 }

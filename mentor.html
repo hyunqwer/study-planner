@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>멘토 대시보드 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  .mentee-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+  .mentee-chip { padding:7px 14px; border-radius:99px; border:2px solid var(--surface-3);
+    background:var(--surface-2); font-size:13px; font-weight:600; cursor:pointer;
+    color:var(--text-2); transition:all .15s; }
+  .mentee-chip.active { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,.08); }
+  .ai-box { background:var(--surface-2); border-left:3px solid var(--primary);
+    border-radius:0 var(--r) var(--r) 0; padding:14px 16px; margin-bottom:10px; }
+  .ai-box .ai-label { font-size:11px; font-weight:700; color:var(--primary);
+    text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+  .ai-box .ai-text { font-size:14px; line-height:1.7; color:var(--text); }
+  .coaching-item { background:var(--success-dim); border:1px solid var(--success);
+    border-radius:var(--r); padding:12px 14px; margin-bottom:8px;
+    font-size:13px; line-height:1.6; color:var(--text); }
+  .coaching-item::before { content:'💡 '; }
+  .progress-book { margin-bottom:14px; }
+  .progress-book-title { font-size:13px; font-weight:700; margin-bottom:6px; }
+  .progress-book-meta { font-size:12px; color:var(--text-3); margin-bottom:6px; }
+  .no-mentee { text-align:center; padding:60px 0; color:var(--text-3); }
+  .period-row { display:flex; gap:8px; margin-bottom:16px; }
+  .period-btn { flex:1; padding:8px; border:1.5px solid var(--surface-3); border-radius:var(--r);
+    background:var(--surface-2); font-size:13px; font-weight:600; color:var(--text-3);
+    cursor:pointer; transition:all .15s; font-family:inherit; }
+  .period-btn.active { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,.08); }
+</style>
+</head>
+<body>
+
+<header class="nav-bar" style="justify-content:space-between">
+  <span class="nav-logo">작전<span>노트</span></span>
+  <button onclick="logout()"
+    style="border:none;background:none;font-size:12px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit">로그아웃</button>
+</header>
+
+<main class="container">
+
+  <!-- 멘토 인사 -->
+  <div class="mb-16" id="mentor-greeting" style="display:none">
+    <p style="font-size:12px;color:var(--text-3);margin-bottom:4px" id="greeting-date-m"></p>
+    <h1 id="greeting-msg-m" style="font-size:20px">안녕하세요!</h1>
+  </div>
+
+  <!-- 멘티 없음 — 온보딩 -->
+  <div id="no-mentee-section" style="display:none">
+
+    <div class="hero-card" style="cursor:default;text-align:center;padding:32px 20px">
+      <div style="font-size:36px;margin-bottom:12px">👀</div>
+      <div class="hero-title" style="font-size:18px;margin-bottom:8px">멘티를 연결하면<br>학습 현황이 여기에 보여요</div>
+      <div class="hero-sub">멘티 이메일로 연결 요청을 보내보세요</div>
+    </div>
+
+    <!-- 사용 방법 -->
+    <div class="card" style="margin-top:0">
+      <div class="card-label" style="margin-bottom:14px">이렇게 사용해요</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;
+            font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:2px">멘티 연결</div>
+            <div class="text-sm text-2">아이·학생 이메일로 연결 요청 → 수락하면 바로 연결</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;
+            font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:2px">학습 현황 확인</div>
+            <div class="text-sm text-2">주간·월간 달성률, 교재별 진도를 한눈에</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;
+            font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:2px">AI 피드백 받기</div>
+            <div class="text-sm text-2">학습 데이터 기반 분석과 코칭 포인트 제공</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a href="connect.html" class="btn btn-primary btn-lg" style="width:100%;display:block;text-align:center;box-sizing:border-box">
+      멘티 연결하기
+    </a>
+  </div>
+
+  <!-- 멘티 선택 칩 -->
+  <div id="mentee-picker" style="display:none">
+    <div class="mb-12">
+      <p class="text-xs text-3" style="margin-bottom:6px">멘티 선택</p>
+      <div class="mentee-chip-row" id="mentee-chips"></div>
+    </div>
+  </div>
+
+  <!-- 대시보드 본문 -->
+  <div id="dashboard" style="display:none">
+
+    <!-- 기간 선택 -->
+    <div class="period-row" style="flex-wrap:wrap;gap:6px">
+      <button class="period-btn active" id="btn-week" onclick="setPeriod('week')">이번 주</button>
+      <button class="period-btn" id="btn-lastweek" onclick="setPeriod('lastweek')">지난 주</button>
+      <button class="period-btn" id="btn-month" onclick="setPeriod('month')">이번 달</button>
+      <button class="period-btn" id="btn-lastmonth" onclick="setPeriod('lastmonth')">지난 달</button>
+    </div>
+
+    <!-- 진행 현황 -->
+    <div class="card">
+      <div class="card-label">학습 진행 현황</div>
+      <div class="stat-grid mt-8">
+        <div class="stat-cell">
+          <div class="stat-num" id="m-week-pct">—</div>
+          <div class="stat-lbl" id="m-pct-label">주간 달성률</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="m-week-done">0</div>
+          <div class="stat-lbl">완료 쪽수</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="m-books-count">0</div>
+          <div class="stat-lbl">진행 중 교재</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="m-total-pct">—</div>
+          <div class="stat-lbl">전체 진행률</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 교재별 현황 -->
+    <div class="card" id="books-card">
+      <div class="card-label">교재별 현황</div>
+      <div id="books-detail" style="margin-top:12px"></div>
+    </div>
+
+    <!-- 독서 & 토론 현황 -->
+    <div class="card" id="reading-card">
+      <div class="card-label" style="margin-bottom:12px">독서 & 토론</div>
+      <div id="reading-stat-row" class="stat-grid" style="margin-bottom:12px">
+        <div class="stat-cell">
+          <div class="stat-num" id="m-reading-count">—</div>
+          <div class="stat-lbl">읽는 중</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="m-week-reading">—</div>
+          <div class="stat-lbl">이번 주 완독</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num" id="m-discuss-count">—</div>
+          <div class="stat-lbl">토론 완료</div>
+        </div>
+      </div>
+      <div id="reading-books-list" style="margin-bottom:8px"></div>
+      <div id="discussion-sessions-list"></div>
+    </div>
+
+    <!-- AI 피드백 -->
+    <div class="card" id="ai-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-label" style="margin:0">AI 피드백</div>
+        <button class="btn btn-sm" style="background:var(--surface-3);color:var(--text-2);font-size:12px"
+          onclick="generateAIFeedback()" id="ai-refresh-btn">새로 생성</button>
+      </div>
+
+      <div id="ai-loading" style="display:none;text-align:center;padding:20px 0;color:var(--text-3)">
+        <p class="text-sm">AI가 분석 중이에요...</p>
+      </div>
+
+      <div id="ai-empty" style="text-align:center;padding:20px 0;color:var(--text-3)">
+        <p class="text-sm">'새로 생성' 버튼을 눌러 피드백을 받아보세요</p>
+      </div>
+
+      <div id="ai-result" style="display:none">
+        <div class="ai-box">
+          <div class="ai-label">분석</div>
+          <div class="ai-text" id="ai-analysis"></div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="card-label" style="margin-bottom:8px">코칭 포인트</div>
+          <div class="coaching-item" id="coaching-point"></div>
+        </div>
+      </div>
+
+      <!-- 저장된 피드백 -->
+      <div id="saved-feedback" style="display:none">
+        <div class="ai-box">
+          <div class="ai-label">분석 <span style="color:var(--text-3);font-weight:400" id="saved-date"></span></div>
+          <div class="ai-text" id="saved-analysis"></div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="card-label" style="margin-bottom:8px">코칭 포인트</div>
+          <div id="saved-coaching"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="loading-area" style="text-align:center;padding:60px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+</main>
+
+<!-- 하단 네비 -->
+<nav class="bottom-nav">
+  <a href="mentor.html" class="active">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    대시보드
+  </a>
+  <a href="connect.html">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    멘티 연결
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+// Firebase Functions URL (analyzeMission 재활용)
+const FUNCTIONS_BASE = 'https://us-central1-selfstudy-planner.cloudfunctions.net';
+
+let mentees = [];          // 연결된 멘티 목록
+let selectedMentee = null; // { uid, email }
+let currentPeriod = 'week';
+let menteeBooks = [];
+
+async function init(user) {
+  // 인사말
+  const greetingEl = document.getElementById('mentor-greeting');
+  const dateEl     = document.getElementById('greeting-date-m');
+  const msgEl      = document.getElementById('greeting-msg-m');
+  greetingEl.style.display = 'block';
+  const DAY = ['일','월','화','수','목','금','토'];
+  const now = new Date();
+  dateEl.textContent = `${now.getMonth()+1}월 ${now.getDate()}일 ${DAY[now.getDay()]}요일`;
+  const name = user.email?.split('@')[0] || '멘토';
+  msgEl.textContent = `${name}님, 안녕하세요!`;
+
+  // URL에 menteeUid 파라미터 있으면 바로 해당 멘티 선택
+  const params = new URLSearchParams(location.search);
+  const preselect = params.get('menteeUid');
+
+  const conns = await getMyConnections('accepted');
+  mentees = conns.map(c => ({ uid: c.menteeUid, email: c.menteeEmail }));
+
+  document.getElementById('loading-area').style.display = 'none';
+
+  if (!mentees.length) {
+    document.getElementById('no-mentee-section').style.display = 'block';
+    return;
+  }
+
+  // 칩 렌더
+  document.getElementById('mentee-picker').style.display = 'block';
+  const chipsEl = document.getElementById('mentee-chips');
+  chipsEl.innerHTML = mentees.map((m, i) => `
+    <button class="mentee-chip ${i === 0 && !preselect ? 'active' : ''}"
+      id="chip-${m.uid}" onclick="selectMentee('${m.uid}', '${m.email}')">
+      ${m.email.split('@')[0]}
+    </button>`).join('');
+
+  // 초기 선택
+  const initial = preselect
+    ? mentees.find(m => m.uid === preselect) || mentees[0]
+    : mentees[0];
+  if (preselect) {
+    document.querySelectorAll('.mentee-chip').forEach(c => c.classList.remove('active'));
+    const chip = document.getElementById(`chip-${initial.uid}`);
+    if (chip) chip.classList.add('active');
+  }
+  await selectMentee(initial.uid, initial.email);
+}
+
+async function selectMentee(uid, email) {
+  selectedMentee = { uid, email };
+  document.querySelectorAll('.mentee-chip').forEach(c => c.classList.remove('active'));
+  const chip = document.getElementById(`chip-${uid}`);
+  if (chip) chip.classList.add('active');
+
+  document.getElementById('dashboard').style.display = 'none';
+
+  try {
+    await loadDashboard();
+  } catch(e) {
+    console.error('loadDashboard error:', e);
+  }
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+function getPeriodDates(p) {
+  if (p === 'week') return getThisWeekDates();
+  if (p === 'month') return getThisMonthDates();
+  if (p === 'lastweek') {
+    return getThisWeekDates().map(d => {
+      const dt = new Date(d); dt.setDate(dt.getDate() - 7);
+      return dt.toISOString().slice(0, 10);
+    });
+  }
+  if (p === 'lastmonth') {
+    const now = new Date();
+    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const month = now.getMonth() === 0 ? 12 : now.getMonth(); // 1-indexed prev month
+    const lastDay = new Date(year, month, 0).getDate();
+    const dates = [];
+    for (let d = 1; d <= lastDay; d++) {
+      dates.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    }
+    return dates;
+  }
+  return getThisWeekDates();
+}
+
+function setPeriod(p) {
+  currentPeriod = p;
+  ['week','lastweek','month','lastmonth'].forEach(k => {
+    document.getElementById('btn-' + k)?.classList.toggle('active', p === k);
+  });
+  const labels = { week:'주간 달성률', lastweek:'주간 달성률', month:'월간 달성률', lastmonth:'월간 달성률' };
+  document.getElementById('m-pct-label').textContent = labels[p] || '달성률';
+  loadDashboard();
+}
+
+async function loadDashboard() {
+  const uid = selectedMentee.uid;
+  menteeBooks = await getMenteeBooksFor(uid);
+
+  const activeBooks = menteeBooks.filter(b => b.status === 'active');
+  document.getElementById('m-books-count').textContent = activeBooks.length;
+
+  // 기간 날짜 계산
+  const dates = getPeriodDates(currentPeriod);
+  const isWeekPeriod = currentPeriod === 'week' || currentPeriod === 'lastweek';
+
+  let totalGoal = 0, totalDone = 0;
+  const booksDetail = [];
+
+  for (const book of activeBooks) {
+    const { weeklyPages = 0, dailyPages = 0 } = (book.totalPages && book.startDate && book.targetEndDate)
+      ? calcDailyPages(book.totalPages, book.startDate, book.targetEndDate)
+      : {};
+    const periodGoal = isWeekPeriod ? (weeklyPages || 0) : (weeklyPages || 0) * 4;
+    let periodDone = 0;
+
+    const logs = await getDailyLogsForDates(uid, book.id, dates);
+    Object.values(logs).forEach(l => { if (l) periodDone += (l.completedPages || l.completed || 0); });
+
+    const allDone = await getMenteeTotalCompletedFor(uid, book.id);
+    const totalPct = book.totalPages
+      ? Math.round(allDone / book.totalPages * 100)
+      : 0;
+
+    totalGoal += periodGoal;
+    totalDone += periodDone;
+
+    booksDetail.push({
+      title: book.title, subject: book.subject,
+      periodGoal, periodDone,
+      totalPct, dailyPages,
+      daysLeft: Math.max(0, diffDays(today(), book.targetEndDate)),
+    });
+  }
+
+  const pct = totalGoal ? Math.round(totalDone / totalGoal * 100) : 0;
+  const avgTotalPct = booksDetail.length
+    ? Math.round(booksDetail.reduce((s, b) => s + b.totalPct, 0) / booksDetail.length)
+    : 0;
+
+  document.getElementById('m-week-pct').textContent = totalGoal ? `${pct}%` : '—';
+  document.getElementById('m-week-done').textContent = totalDone;
+  document.getElementById('m-total-pct').textContent = booksDetail.length ? `${avgTotalPct}%` : '—';
+
+  // 교재별
+  const booksEl = document.getElementById('books-detail');
+  if (booksDetail.length) {
+    booksEl.innerHTML = booksDetail.map(b => {
+      const bPct = b.periodGoal ? Math.min(100, Math.round(b.periodDone / b.periodGoal * 100)) : 0;
+      return `
+        <div class="progress-book">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div class="progress-book-title">[${b.subject}] ${b.title}</div>
+            <div style="font-size:12px;font-weight:700;color:var(--primary)">${bPct}%</div>
+          </div>
+          <div class="progress-book-meta">
+            ${isWeekPeriod ? '주간' : '월간'} ${b.periodDone}/${b.periodGoal}쪽 · 전체 ${b.totalPct}% · D-${b.daysLeft}
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width:${bPct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+  } else {
+    booksEl.innerHTML = '<p class="text-sm text-3">진행 중인 교재가 없어요</p>';
+  }
+
+  // 독서 & 토론 현황 로드
+  await loadReadingSection(uid);
+
+  // 저장된 AI 피드백 로드
+  await loadSavedFeedback();
+}
+
+async function loadReadingSection(uid) {
+  try {
+    const rBooks = await getMenteeReadingBooks(uid);
+    const weekDone = await getWeeklyCompletedCount(uid);
+
+    const reading   = rBooks.filter(b => b.status === 'reading');
+    const discussed = rBooks.filter(b => b.status === 'discussed');
+
+    document.getElementById('m-reading-count').textContent = reading.length;
+    document.getElementById('m-week-reading').textContent = weekDone;
+    document.getElementById('m-discuss-count').textContent = discussed.length;
+
+    // 읽는 중 책 목록
+    const booksListEl = document.getElementById('reading-books-list');
+    if (reading.length) {
+      booksListEl.innerHTML = reading.map(b => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;
+          border-bottom:1px solid var(--surface-3)">
+          <div style="font-size:18px">📖</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${b.title}</div>
+            <div style="font-size:11px;color:var(--text-3)">${b.genre || ''} · 읽는 중</div>
+          </div>
+        </div>`).join('');
+    } else {
+      booksListEl.innerHTML = '<p class="text-sm text-3" style="padding:6px 0">읽는 중인 책이 없어요</p>';
+    }
+
+    // 최근 토론 세션
+    const sessListEl = document.getElementById('discussion-sessions-list');
+    const sessions = await getMenteeRecentSessions(uid, 3);
+    if (sessions.length) {
+      const BLOOM_LABEL = { 1:'💭 회상', 2:'🔍 분석', 3:'✨ 창의·적용' };
+      sessListEl.innerHTML = `
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);
+          text-transform:uppercase;letter-spacing:.04em;margin:12px 0 8px">최근 토론</div>
+        ${sessions.map(s => `
+          <div style="background:var(--surface-2);border-radius:var(--r);
+            padding:12px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-size:13px;font-weight:700">${s.bookTitle}</div>
+              <div style="font-size:11px;font-weight:700;color:var(--primary)">
+                ${BLOOM_LABEL[s.bloomReached] || ''}
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-2);line-height:1.6">
+              ${s.summary ? s.summary.slice(0, 100) + (s.summary.length > 100 ? '...' : '') : '요약 없음'}
+            </div>
+            ${(s.coachingPoints || []).length ? `
+              <div style="margin-top:8px;padding:8px;background:var(--success-dim);
+                border-radius:8px;font-size:12px;color:var(--text)">
+                💡 ${s.coachingPoints[0]}
+              </div>` : ''}
+          </div>`).join('')}`;
+    } else {
+      sessListEl.innerHTML = '<p class="text-sm text-3" style="padding:4px 0">아직 토론 기록이 없어요</p>';
+    }
+  } catch(e) {
+    console.warn('reading section load failed', e);
+  }
+}
+
+async function loadSavedFeedback() {
+  const uid = selectedMentee.uid;
+  const periodKey = getPeriodKey();
+  try {
+    const snap = await db.collection('users').doc(uid)
+      .collection('mentorReports').doc(periodKey).get();
+    if (snap.exists) {
+      const data = snap.data();
+      document.getElementById('ai-empty').style.display = 'none';
+      document.getElementById('ai-result').style.display = 'block';
+      document.getElementById('saved-feedback').style.display = 'block';
+      document.getElementById('feedback-period-label').textContent = getPeriodLabel();
+      document.getElementById('feedback-text').textContent = data.feedback || '';
+      document.getElementById('save-btn').style.display = 'none';
+    } else {
+      document.getElementById('saved-feedback').style.display = 'none';
+    }
+  } catch(e) {
+    console.warn('loadSavedFeedback error', e);
+  }
+}
+
+// ── AI 피드백 ───────────────────────────────────────────────
+function getPeriodKey() {
+  // 이번 주 월~일 범위로 키 생성
+  const now = new Date();
+  const dow = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  return monday.toISOString().slice(0,10) + '_' + sunday.toISOString().slice(0,10);
+}
+
+function getPeriodLabel() {
+  const labels = { week:'이번 주', lastweek:'지난 주', month:'이번 달', lastmonth:'지난 달' };
+  return labels[currentPeriod] || '이번 주';
+}
+
+function getWeekDatesArray() {
+  const now = new Date();
+  const dow = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+  return dates;
+}
+
+async function generateAIFeedback() {
+  if (!selectedMentee) return;
+  const btn = document.getElementById('ai-refresh-btn');
+  btn.textContent = '생성 중...'; btn.disabled = true;
+  document.getElementById('ai-loading').style.display = 'block';
+  document.getElementById('ai-empty').style.display = 'none';
+  document.getElementById('ai-result').style.display = 'none';
+  document.getElementById('saved-feedback').style.display = 'none';
+
+  try {
+    const res = await fetch(FUNCTIONS_BASE + '/generateMentorFeedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mentorUid: USER_ID,
+        menteeUid: selectedMentee.uid,
+        periodKey: getPeriodKey(),
+        weekDates: getWeekDatesArray(),
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || res.status);
+    const data = await res.json();
+    renderAIFeedback(data);
+  } catch(e) {
+    alert('AI 피드백 생성 실패: ' + e.message);
+  } finally {
+    document.getElementById('ai-loading').style.display = 'none';
+    btn.textContent = '새로 생성'; btn.disabled = false;
+  }
+}
+
+function renderAIFeedback(data) {
+  const SITUATION = {
+    great: '🎉 이번 주 아주 잘했어요!',
+    on_track: '✅ 꾸준히 잘 가고 있어요',
+    needs_push: '⚡ 조금 더 밀어줄 필요가 있어요',
+    struggling: '🚨 이번 주 많이 힘들었어요',
+  };
+  document.getElementById('ai-empty').style.display = 'none';
+  document.getElementById('ai-result').style.display = 'block';
+  document.getElementById('saved-feedback').style.display = 'block';
+  document.getElementById('feedback-period-label').textContent = getPeriodLabel ? getPeriodLabel() : '';
+  document.getElementById('saved-analysis').textContent =
+    (SITUATION[data.situation] || '') + ' ' + (data.summary || '');
+  document.getElementById('saved-coaching').innerHTML =
+    `<div style="background:var(--surface-2);padding:12px;border-radius:var(--r);font-size:13px;margin-bottom:8px">
+       💡 <strong>코칭 포인트</strong><br>${data.coachingTip || ''}
+     </div>
+     <div style="background:var(--surface-2);padding:12px;border-radius:var(--r);font-size:13px">
+       🎯 <strong>다음 주 방향</strong><br>${data.nextWeekGoal || ''}
+     </div>`;
+  document.getElementById('saved-date').textContent =
+    new Date(data.generatedAt || Date.now()).toLocaleDateString('ko', { month:'long', day:'numeric' });
+}
+
+
+requireAuth(init);
+setActiveNav('mentor');
+</script>
+</body>
+</html>

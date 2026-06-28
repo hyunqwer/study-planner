@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>과제 등록 — 작전노트</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#6366f1">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="작전노트">
+<link rel="stylesheet" href="style.css">
+<style>
+  .type-card { border:2px solid var(--surface-3); border-radius:var(--r); padding:16px;
+    cursor:pointer; background:var(--surface-2); transition:all .15s; margin-bottom:10px; }
+  .type-card.selected { border-color:var(--primary); background:rgba(99,102,241,.06); }
+  .type-card-title { font-size:15px; font-weight:700; margin-bottom:4px; }
+  .type-card-desc { font-size:12px; color:var(--text-3); line-height:1.5; }
+  .day-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:8px; }
+  .day-btn { padding:10px 0; border:2px solid var(--surface-3); border-radius:var(--r);
+    background:var(--surface-2); font-size:13px; font-weight:700; cursor:pointer;
+    color:var(--text-2); text-align:center; font-family:inherit; transition:all .15s; }
+  .day-btn.selected { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,.08); }
+  .sub-item-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .sub-item-row input { flex:1; }
+  .remove-btn { width:30px; height:30px; border:none; background:var(--surface-3);
+    border-radius:50%; cursor:pointer; font-size:16px; line-height:1;
+    color:var(--text-3); flex-shrink:0; }
+  #error-box { display:none; background:#fee2e2; color:#dc2626;
+    padding:12px 14px; border-radius:8px; font-size:13px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">과제 등록</span>
+</header>
+
+<main class="container">
+
+  <!-- 유형 -->
+  <div class="form-group">
+    <label class="form-label">과제 유형</label>
+    <div id="card-homework" class="type-card selected" onclick="selectType('homework')">
+      <div class="type-card-title">📋 주간 숙제</div>
+      <div class="type-card-desc">진행률(%)로 체크해요.<br>예: 학원 주말숙제, 독후감, 프로젝트</div>
+    </div>
+    <div id="card-lesson" class="type-card" onclick="selectType('lesson')">
+      <div class="type-card-title">🎬 강의 / 학습앱</div>
+      <div class="type-card-desc">완료 체크박스로 확인해요. 세부 항목 추가 가능.<br>예: 인강 1강, 단어장앱, 복습앱</div>
+    </div>
+  </div>
+
+  <!-- 이름 -->
+  <div class="form-group">
+    <label class="form-label">과제 이름 <span style="color:var(--primary)">*</span></label>
+    <input class="form-input" type="text" id="task-name" placeholder="예: 영어학원 주말숙제">
+  </div>
+
+  <!-- 요일 -->
+  <div class="form-group">
+    <label class="form-label">진행 요일 <span style="color:var(--primary)">*</span></label>
+    <div class="day-grid">
+      <button class="day-btn" data-day="1" onclick="toggleDay(this)">월</button>
+      <button class="day-btn" data-day="2" onclick="toggleDay(this)">화</button>
+      <button class="day-btn" data-day="3" onclick="toggleDay(this)">수</button>
+      <button class="day-btn" data-day="4" onclick="toggleDay(this)">목</button>
+      <button class="day-btn" data-day="5" onclick="toggleDay(this)">금</button>
+      <button class="day-btn" data-day="6" onclick="toggleDay(this)">토</button>
+      <button class="day-btn" data-day="0" onclick="toggleDay(this)">일</button>
+    </div>
+  </div>
+
+  <!-- 세부항목 (lesson만) -->
+  <div class="form-group" id="sub-section" style="display:none">
+    <label class="form-label">세부 항목
+      <span class="text-3" style="font-weight:400"> (선택 — 항목별로 각각 체크)</span>
+    </label>
+    <div id="sub-list"></div>
+    <button class="btn btn-ghost btn-sm mt-8" onclick="addSubItem()">+ 항목 추가</button>
+  </div>
+
+  <div id="error-box"></div>
+  <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px"
+    id="reg-btn" onclick="register()">과제 등록하기</button>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let taskType = 'homework';
+let subCount = 0;
+
+function selectType(t) {
+  taskType = t;
+  document.getElementById('card-homework').classList.toggle('selected', t === 'homework');
+  document.getElementById('card-lesson').classList.toggle('selected', t === 'lesson');
+  document.getElementById('sub-section').style.display = t === 'lesson' ? 'block' : 'none';
+  document.getElementById('task-name').placeholder =
+    t === 'homework' ? '예: 영어학원 주말숙제' : '예: 영어인강 + 단어앱';
+}
+
+function toggleDay(btn) { btn.classList.toggle('selected'); }
+
+function addSubItem() {
+  const id = 'sub-input-' + (++subCount);           // ← 충돌 없는 ID 사용
+  const row = document.createElement('div');
+  row.className = 'sub-item-row';
+  row.id = 'sub-row-' + subCount;
+  row.innerHTML =
+    `<input class="form-input sub-input" type="text" id="${id}" placeholder="예: 강의 1강">` +
+    `<button class="remove-btn" onclick="this.parentNode.remove()">×</button>`;
+  document.getElementById('sub-list').appendChild(row);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('error-box');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function clearErr() { document.getElementById('error-box').style.display = 'none'; }
+
+async function register() {
+  clearErr();
+
+  const name = document.getElementById('task-name').value.trim();
+  if (!name) { showErr('과제 이름을 입력해 주세요.'); return; }
+
+  const days = Array.from(document.querySelectorAll('.day-btn.selected'))
+                    .map(b => parseInt(b.dataset.day));
+  if (!days.length) { showErr('진행 요일을 하나 이상 선택해 주세요.'); return; }
+
+  // ── 버그 수정: #sub-list 안의 input만 정확히 선택 ──
+  const subItems = taskType === 'lesson'
+    ? Array.from(document.querySelectorAll('#sub-list .sub-input'))
+           .map(el => el.value.trim()).filter(Boolean)
+    : [];
+
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+
+  try {
+    // USER_ID 안전 획득
+    if (!USER_ID) {
+      const u = auth.currentUser;
+      if (!u) throw new Error('로그인 세션이 만료됐어요. 다시 로그인해 주세요.');
+      USER_ID = u.uid;
+    }
+
+    // Firestore 직접 쓰기 (app.js saveTask와 동일하지만 명시적으로)
+    await db.collection('users').doc(USER_ID)
+      .collection('tasks').doc()
+      .set({
+        name,
+        type: taskType,
+        days,
+        subItems,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      });
+
+    location.href = 'bookshelf.html?tab=tasks';
+
+  } catch (e) {
+    console.error('[task-register] error:', e);
+    const msg = e.code === 'permission-denied' || (e.message || '').includes('permissions')
+      ? '저장 실패: Firestore 권한 없음. "firebase deploy --only firestore:rules" 를 실행해 주세요.'
+      : '저장 실패: ' + (e.message || e.code || '알 수 없는 오류');
+    showErr(msg);
+    btn.disabled = false;
+    btn.textContent = '과제 등록하기';
+  }
+}
+
+requireAuth(() => {
+  // 페이지 로드 후 로그인 확인만 — 별도 초기화 불필요
+});
+</script>
+</body>
+</html>

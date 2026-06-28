@@ -3,8 +3,164 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>주간 점검 — 작전노트</title>
-<link rel="stylesheet" href="style.css">
+<title>작전회의 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  /* 기간 탭 */
+  .period-tab {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: var(--r-lg);
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+  .period-tab button {
+    flex: 1; padding: 8px; border: none;
+    border-radius: var(--r); background: transparent;
+    color: var(--text-3); font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .period-tab button.active {
+    background: var(--surface); color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+
+  /* 긴급 작전지 */
+  .alert-urgent {
+    background: linear-gradient(135deg,#ff4757,#c0392b);
+    border-radius: var(--r-xl); padding: 20px; color:#fff; margin-bottom:16px;
+  }
+  .alert-urgent .badge {
+    font-size:11px; font-weight:700; letter-spacing:.06em;
+    background:rgba(255,255,255,.25); display:inline-block;
+    padding:2px 8px; border-radius:99px; margin-bottom:8px;
+  }
+  .alert-urgent h3 { font-size:16px;font-weight:700;margin-bottom:6px;color:#fff; }
+  .alert-urgent p  { font-size:13px;opacity:.9;line-height:1.6; }
+
+  /* 달성률 링 */
+  .pct-ring-wrap { display:flex;align-items:center;gap:20px;padding:4px 0 12px; }
+  .pct-ring { position:relative;width:80px;height:80px;flex-shrink:0; }
+  .pct-ring svg { transform:rotate(-90deg); }
+  .pct-ring .ring-num {
+    position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;font-size:18px;font-weight:800;
+  }
+  .ring-detail .ring-title { font-size:13px;font-weight:700;margin-bottom:4px; }
+  .ring-detail .ring-sub   { font-size:11px;color:var(--text-3); }
+
+  /* 요일 도트 */
+  .streak-row { display:flex;gap:6px;flex-wrap:wrap;margin-top:10px; }
+  .streak-dot {
+    width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;flex-direction:column;gap:1px;
+  }
+  .streak-dot.done   { background:var(--success);color:#fff; }
+  .streak-dot.miss   { background:var(--danger-dim,#fee2e2);color:var(--danger); }
+  .streak-dot.today  { background:var(--primary);color:#fff; }
+  .streak-dot.rest   { background:var(--surface-2);color:var(--text-3); }
+  .streak-dot.future { background:var(--surface-2);color:var(--text-3);opacity:.5; }
+
+  /* Step 헤더 */
+  .step-header {
+    display:flex;align-items:center;gap:10px;margin-bottom:14px;
+  }
+  .step-num {
+    width:24px;height:24px;border-radius:50%;
+    background:var(--primary);color:#fff;
+    font-size:12px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .step-header h3 { font-size:15px;font-weight:700;margin:0; }
+
+  /* AI 박스 */
+  .ai-box {
+    background:var(--surface-2);border-radius:var(--r-lg);
+    padding:14px;font-size:13px;line-height:1.75;color:var(--text-2);
+  }
+  .ai-label { font-size:11px;font-weight:700;color:var(--primary);display:block;margin-bottom:6px;letter-spacing:.05em; }
+
+  /* 교재별 조정 카드 */
+  .book-adjust-card {
+    border:1.5px solid var(--border);border-radius:var(--r-lg);
+    padding:16px;margin-bottom:10px;
+    transition:border-color .15s;
+  }
+  .book-adjust-card.changed { border-color:var(--primary);background:var(--primary-glow); }
+  .book-adjust-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:10px; }
+  .book-adjust-title  { font-size:13px;font-weight:700; }
+  .book-adjust-pct    { font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px; }
+  .book-adjust-pct.good   { background:var(--success-dim,#dcfce7);color:var(--success); }
+  .book-adjust-pct.mid    { background:var(--primary-dim);color:var(--primary); }
+  .book-adjust-pct.bad    { background:#fee2e2;color:var(--danger); }
+
+  .ai-suggest { font-size:12px;color:var(--text-3);margin-bottom:10px; }
+  .ai-suggest strong { color:var(--primary); }
+
+  /* [−] 숫자 [+] 스테퍼 */
+  .stepper { display:flex;align-items:center;gap:0; }
+  .stepper-btn {
+    width:36px;height:36px;border-radius:var(--r);
+    border:1.5px solid var(--border-2);
+    background:var(--surface);color:var(--text);
+    font-size:18px;font-weight:300;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .12s,border-color .12s;
+  }
+  .stepper-btn:active { background:var(--surface-2); }
+  .stepper-val {
+    min-width:64px;text-align:center;
+    font-size:16px;font-weight:800;
+    padding:0 10px;
+  }
+  .stepper-unit { font-size:12px;color:var(--text-3);margin-left:6px; }
+  .stepper-diff { font-size:11px;margin-left:8px; }
+  .stepper-diff.up   { color:var(--success); }
+  .stepper-diff.down { color:var(--danger); }
+  .stepper-diff.same { color:var(--text-3); }
+
+  /* 미리보기 변경사항 */
+  .preview-row {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;
+  }
+  .preview-row:last-child { border-bottom:none; }
+  .preview-badge { font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px; }
+  .preview-badge.up   { background:#dcfce7;color:var(--success); }
+  .preview-badge.down { background:#fee2e2;color:var(--danger); }
+  .preview-badge.same { background:var(--surface-2);color:var(--text-3); }
+
+  /* 공유 버튼 */
+  .share-btn {
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;padding:14px;border-radius:var(--r-lg);
+    border:1.5px dashed var(--border-2);background:transparent;
+    color:var(--text-2);font-size:13px;font-weight:600;cursor:pointer;
+    transition:border-color .15s,color .15s;
+  }
+  .share-btn:hover { border-color:var(--primary);color:var(--primary); }
+
+  /* 월간 막대 */
+  .month-bar-wrap { display:flex;gap:8px;align-items:flex-end;height:72px;margin-bottom:6px; }
+  .month-bar-col  { flex:1;display:flex;flex-direction:column;align-items:center;gap:4px; }
+  .month-bar      { width:100%;border-radius:4px 4px 0 0;min-height:4px;background:var(--primary); }
+  .month-bar-pct  { font-size:10px;color:var(--text-3); }
+
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spinner-sm {
+    width:16px;height:16px;border:2px solid var(--border-2);
+    border-top-color:var(--primary);border-radius:50%;
+    animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;
+  }
+</style>
 </head>
 <body>
 
@@ -12,88 +168,184 @@
   <button class="nav-back" onclick="history.back()">
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
   </button>
-  <span class="nav-title">주간 점검</span>
+  <span class="nav-title">작전회의</span>
 </header>
 
 <main class="container">
 
   <div id="loading-msg" style="text-align:center;padding:80px 0;color:var(--text-3)">
-    <p class="text-sm">불러오는 중</p>
+    <p class="text-sm">데이터 불러오는 중...</p>
   </div>
 
   <div id="main-content" style="display:none">
 
-    <!-- 1단계: 결과 -->
-    <div class="card mb-12">
-      <div class="card-label">이번 주 전체 결과</div>
-      <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1" id="result-pct">—</div>
-      <p class="text-sm text-2 mt-8" id="result-detail"></p>
-      <div class="progress-track mt-12">
-        <div class="progress-fill" id="result-progress" style="width:0%"></div>
+    <!-- 기간 탭 -->
+    <div class="period-tab">
+      <button class="active" id="tab-week"  onclick="switchPeriod('week')">이번 주</button>
+      <button id="tab-month" onclick="switchPeriod('month')">이번 달</button>
+    </div>
+
+    <!-- ══════════════════ 주간 뷰 ══════════════════ -->
+    <div id="week-view">
+
+      <!-- 긴급 작전지 -->
+      <div id="urgent-alert" style="display:none">
+        <div class="alert-urgent">
+          <div class="badge">⚡ 긴급 작전지</div>
+          <h3 id="urgent-title"></h3>
+          <p id="urgent-body"></p>
+        </div>
       </div>
-      <div class="callout callout-primary mt-12" id="result-message"></div>
-    </div>
 
-    <div class="card mb-12">
-      <div class="card-label">교재별 실행률</div>
-      <div id="book-breakdown"></div>
-    </div>
+      <!-- STEP 1: 이번 주 결과 -->
+      <div class="card mb-12">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <h3>이번 주 결과</h3>
+        </div>
 
-    <!-- 2단계: 이유 -->
-    <div class="card mb-12" id="reason-step" style="display:none">
-      <div class="card-label">왜 그랬을까?</div>
-      <p class="text-sm text-2 mb-12">솔직하게 골라봐. 다음 작전을 위한 거야.</p>
-      <div class="chip-group" id="reason-chips">
-        <button class="chip" onclick="selectReason(this,'too-much')">계획이 너무 많았다</button>
-        <button class="chip" onclick="selectReason(this,'hard')">문제가 생각보다 어려웠다</button>
-        <button class="chip" onclick="selectReason(this,'no-time')">시간이 부족했다</button>
-        <button class="chip" onclick="selectReason(this,'unfocused')">집중이 잘 안 됐다</button>
-        <button class="chip" onclick="selectReason(this,'lazy')">하기 싫었다</button>
-        <button class="chip" onclick="selectReason(this,'schedule')">다른 일정이 많았다</button>
-        <button class="chip" onclick="selectReason(this,'unknown')">잘 모르겠다</button>
+        <div class="pct-ring-wrap">
+          <div class="pct-ring">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-2)" stroke-width="8"/>
+              <circle cx="40" cy="40" r="34" fill="none" stroke="var(--primary)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="213.6" id="ring-dash" stroke-dashoffset="213.6"/>
+            </svg>
+            <div class="ring-num" id="ring-pct">0%</div>
+          </div>
+          <div class="ring-detail">
+            <div class="ring-title" id="ring-title">—</div>
+            <div class="ring-sub"  id="ring-sub"></div>
+          </div>
+        </div>
+
+        <!-- 요일별 도트 -->
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">요일별 달성</div>
+        <div class="streak-row" id="streak-row"></div>
+
+        <!-- 교재별 현황 -->
+        <div style="margin-top:16px" id="book-breakdown"></div>
+
+        <!-- 과제 달성 현황 -->
+        <div id="task-breakdown" style="margin-top:16px;border-top:1px solid var(--surface-3);padding-top:14px">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">이번 주 과제</div>
+          <div id="task-breakdown-list"></div>
+        </div>
       </div>
-    </div>
 
-    <!-- 3단계: 다음 주 -->
-    <div class="card mb-12" id="next-step" style="display:none">
-      <div class="card-label">다음 주 작전</div>
-      <div class="chip-group" id="next-chips">
-        <button class="chip" onclick="selectNext(this,'keep')">그대로 유지</button>
-        <button class="chip" onclick="selectNext(this,'less')">하루 분량 줄이기</button>
-        <button class="chip" onclick="selectNext(this,'weekend')">주말에 보충</button>
-        <button class="chip" onclick="selectNext(this,'slow')">어려운 단원 천천히</button>
-        <button class="chip" onclick="selectNext(this,'ask')">부모님 도움 요청</button>
+      <!-- STEP 2: 자체 평가 → 선택하면 AI 자동 분석 -->
+      <div class="card mb-12">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <h3>이번 주 어땠어?</h3>
+        </div>
+        <p class="text-sm text-2 mb-12">솔직하게 골라봐. 선택하면 AI가 바로 분석해줄게.</p>
+        <div class="chip-group" id="reason-chips">
+          <button class="chip" onclick="selectReason(this,'too-easy')">너무 쉬웠다</button>
+          <button class="chip" onclick="selectReason(this,'just-right')">딱 맞았다</button>
+          <button class="chip" onclick="selectReason(this,'too-much')">양이 너무 많았다</button>
+          <button class="chip" onclick="selectReason(this,'hard')">내용이 어려웠다</button>
+          <button class="chip" onclick="selectReason(this,'no-time')">시간이 부족했다</button>
+          <button class="chip" onclick="selectReason(this,'lazy')">하기 싫었다</button>
+          <button class="chip" onclick="selectReason(this,'schedule')">다른 일정이 많았다</button>
+        </div>
       </div>
-    </div>
 
-    <!-- 부모 코칭 -->
-    <div class="card mb-12" id="parent-coach" style="display:none">
-      <div class="card-label">부모님께</div>
-      <div class="text-sm" style="line-height:1.8;color:var(--text-2)" id="coach-message"></div>
-    </div>
-
-    <button class="btn btn-primary btn-lg" id="submit-btn" style="display:none" onclick="submitReview()">
-      주간 점검 완료
-    </button>
-
-    <!-- 완주 CTA -->
-    <div id="completion-cta" style="display:none;margin-top:16px">
-      <div class="card" style="border-color:var(--accent);background:var(--accent-dim);text-align:center;padding:28px">
-        <h3 class="mb-8">책 완주했어?</h3>
-        <p class="text-sm text-2 mb-16">전체 페이지를 다 끝냈다면 완주 리포트를 써봐</p>
-        <a href="report.html" class="btn btn-accent btn-lg">완주 리포트 쓰기</a>
+      <!-- STEP 3: AI 분석 (자체평가 선택 후 자동 표시) -->
+      <div class="card mb-12" id="step-ai" style="display:none">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <h3>AI 작전 분석</h3>
+        </div>
+        <div id="ai-section">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3)">
+            <span class="spinner-sm"></span> 분석 중...
+          </div>
+        </div>
       </div>
-    </div>
 
-  </div>
+      <!-- STEP 4: 교재별 작전 조정 (AI 분석 후 표시) -->
+      <div class="card mb-12" id="step-adjust" style="display:none">
+        <div class="step-header">
+          <div class="step-num">4</div>
+          <h3>교재별 작전 조정</h3>
+        </div>
+        <p class="text-sm text-2 mb-14">AI 제안을 참고해서 교재별로 직접 조정해봐.</p>
+        <div id="book-adjust-list"></div>
+      </div>
+
+      <!-- STEP 5: 변경사항 미리보기 + 확정 (Step4 변경 시 자동 갱신) -->
+      <div class="card mb-12" id="step-preview" style="display:none">
+        <div class="step-header">
+          <div class="step-num">5</div>
+          <h3>다음 주 변경사항 확인</h3>
+        </div>
+        <div id="preview-list"></div>
+
+        <!-- 멘토 공유 -->
+        <div style="margin-top:16px">
+          <p class="text-sm text-2 mb-10">부모님·선생님과 결과를 공유하고 조언을 받아봐.</p>
+          <button class="share-btn" onclick="shareMission()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            부모님 / 선생님과 공유하기
+          </button>
+        </div>
+
+        <button class="btn btn-primary btn-lg mt-16" id="submit-btn" onclick="submitReview()">
+          이 계획으로 확정하기 →
+        </button>
+      </div>
+
+      <!-- 완주 CTA -->
+      <div id="completion-cta" style="display:none;margin-bottom:16px">
+        <div class="card" style="border-color:var(--accent);background:var(--accent-dim);text-align:center;padding:24px">
+          <h3 class="mb-8">책 완주했어? 🎉</h3>
+          <p class="text-sm text-2 mb-14">전체 페이지를 다 끝냈다면 완주 리포트를 써봐</p>
+          <a href="report.html" id="completion-link" class="btn btn-accent btn-lg">완주 리포트 쓰기</a>
+        </div>
+      </div>
+
+    </div><!-- /week-view -->
+
+    <!-- ══════════════════ 월간 뷰 ══════════════════ -->
+    <div id="month-view" style="display:none">
+
+      <div class="card mb-12">
+        <div class="card-label">최근 4주 흐름</div>
+        <div class="month-bar-wrap" id="month-bars"></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-3)" id="month-bar-labels"></div>
+        <div class="callout callout-primary mt-12" id="month-trend-msg"></div>
+      </div>
+
+      <div class="card mb-12">
+        <div class="card-label">교재별 월간 달성률</div>
+        <div id="month-book-breakdown"></div>
+      </div>
+
+      <div class="card mb-12">
+        <div class="card-label">AI 월간 조언</div>
+        <div id="month-ai-section">
+          <button class="btn btn-ghost btn-md w-full" onclick="requestMonthlyAi()">
+            🤖 월간 AI 분석 받기
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /month-view -->
+
+  </div><!-- /main-content -->
 </main>
 
 <nav class="bottom-nav">
   <a href="index.html" data-page="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</a>
   <a href="mission.html" data-page="mission"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션</a>
+    <a href="reading.html" data-page="reading">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    독서
+  </a>
   <a href="weekly.html" data-page="weekly"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표</a>
-  <a href="review.html" data-page="review" class="active"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검</a>
-  <a href="bookshelf.html" data-page="books"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장</a>
+  <a href="review.html" data-page="review" class="active"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>작전회의</a>
+  <a href="bookshelf.html" data-page="books"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>학습관리</a>
 </nav>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -102,125 +354,576 @@
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script>
-let activeBooks = [], bookResults = [], weekGoal = 0, weekDone = 0, weekPct = 0;
-let selectedReason = '', selectedNext = '';
+// ※ DAY_KO는 app.js에 선언됨
 
-const REASON_MSG = {
-  'too-much':'계획 분량이 좀 많았던 거야. 다음 주엔 줄여봐.',
-  'hard':'문제가 어려웠던 거야. 게으른 게 아니야. 어려운 단원은 천천히.',
-  'no-time':'시간이 부족했던 거야. 요일별 시간을 다시 점검해봐.',
-  'unfocused':'집중이 안 됐던 거야. 공부 시작 루틴을 만들어봐.',
-  'lazy':'하기 싫었던 거야. 솔직하게 말해줘서 고마워.',
-  'schedule':'일정이 바빴던 거야. 바쁜 주엔 목표를 낮추는 것도 전략이야.',
-  'unknown':'잘 모르겠다는 것도 괜찮아. 다음 주에 더 관찰해봐.',
-};
-const COACH_MSG = {
-  high:`"이번 주 계획을 잘 지켰네. 스스로 한 거야."`,
-  mid:`"다 못 지킨 것보다, 이유를 알고 조정한 게 더 중요해."`,
-  low:`"이번 주는 힘들었지? 계획이 너무 많았는지 같이 확인해보자."`,
-};
+const ANALYZE_MISSION_URL = '/api/analyzeMission';
 
+let activeBooks  = [];
+let bookResults  = [];   // { book, goal, done, pct, plan, dayData }
+let taskResults  = [];   // { task, scheduledDays, doneDays, pct }
+let weekGoal = 0, weekDone = 0, weekPct = 0;
+let weekDates    = [];
+let selectedReason = '';
+let aiResult     = null;
+// 교재별 조정값: { bookId: adjustedDailyPages }
+let bookAdjust   = {};
+let currentPeriod = 'week';
+
+// ────────────────────────────────────────
+// 초기화
+// ────────────────────────────────────────
 async function init() {
-  activeBooks = await getActiveBooks();
-  document.getElementById('loading-msg').style.display = 'none';
-  document.getElementById('main-content').style.display = 'block';
-  if (!activeBooks.length) return;
+  try {
+    activeBooks = await getActiveBooks();
+    weekDates   = getThisWeekDates();
+    document.getElementById('loading-msg').style.display  = 'none';
+    document.getElementById('main-content').style.display = 'block';
 
-  const weekDates = getThisWeekDates();
+    if (!activeBooks.length) {
+      document.getElementById('week-view').innerHTML =
+        '<p class="text-sm text-2" style="padding:40px 0;text-align:center">진행 중인 교재가 없어.<br><a href="register.html" class="text-primary">새 교재 등록하기</a></p>';
+      return;
+    }
+    await loadWeekData();
+    checkUrgent();
+    loadReviewTasks();
+    checkCompletion();
+  } catch (e) {
+    console.error('init error:', e);
+    document.getElementById('loading-msg').innerHTML =
+      `<p class="text-sm" style="color:var(--danger)">불러오기 실패: ${e.message || '네트워크를 확인해줘'}</p>
+       <button class="btn btn-ghost btn-sm mt-12" onclick="location.reload()">다시 시도</button>`;
+  }
+}
+
+// ────────────────────────────────────────
+// 주간 데이터 로드
+// ────────────────────────────────────────
+async function loadWeekData() {
   bookResults = await Promise.all(activeBooks.map(async book => {
     const [plan, logs] = await Promise.all([
       getOrCreateWeeklyPlan(book, weekDates),
       getDailyLogsForDates(book.id, weekDates),
     ]);
-    const goal = plan.dailyPages.reduce((a,b)=>a+b,0);
-    const done = weekDates.reduce((sum, d) => sum + (logs[d]?.completedPages || 0), 0);
-    const pct = goal>0 ? Math.round(done/goal*100) : 0;
-    return { book, goal, done, pct, plan };
+    const goal = plan.dailyPages.reduce((a, b) => a + b, 0);
+    const done = weekDates.reduce((s, d) => s + (logs[d]?.completedPages || 0), 0);
+    const pct  = goal > 0 ? Math.round(done / goal * 100) : 0;
+    const dayData = weekDates.map((d, i) => ({
+      date: d,
+      goal: plan.dailyPages[i] || 0,
+      done: logs[d]?.completedPages || 0,
+    }));
+    // 기본 조정값 = 현재 dailyPages
+    bookAdjust[book.id] = book.dailyPages || Math.round(goal / (plan.dailyPages.filter(p=>p>0).length || 1));
+    return { book, goal, done, pct, plan, dayData };
   }));
-  weekGoal = bookResults.reduce((sum, r) => sum + r.goal, 0);
-  weekDone = bookResults.reduce((sum, r) => sum + r.done, 0);
-  weekPct = weekGoal>0 ? Math.round(weekDone/weekGoal*100) : 0;
 
-  document.getElementById('result-pct').textContent = weekPct + '%';
-  document.getElementById('result-detail').textContent = `목표 ${weekGoal}쪽 중 ${weekDone}쪽 완료`;
-  document.getElementById('result-progress').style.width = Math.min(100,weekPct) + '%';
-  document.getElementById('result-message').textContent =
-    weekPct>=90 ? '이번 주 작전 성공. 잘 해냈어.' :
-    weekPct>=60 ? `${weekGoal-weekDone}쪽 못 했지만, 이유를 알면 다음 주엔 달라질 거야.` :
-    '이번 주는 힘들었지? 괜찮아. 계획을 다시 짜면 돼.';
+  weekGoal = bookResults.reduce((s, r) => s + r.goal, 0);
+  weekDone = bookResults.reduce((s, r) => s + r.done, 0);
+  weekPct  = weekGoal > 0 ? Math.round(weekDone / weekGoal * 100) : 0;
 
-  document.getElementById('book-breakdown').innerHTML = bookResults.map(r => `
-    <div style="padding:12px 0;border-bottom:1px solid var(--border)">
-      <div class="flex items-center justify-between mb-8">
-        <span class="text-sm font-semibold">[${r.book.subject}] ${r.book.title}</span>
-        <span class="text-sm font-bold ${r.pct >= 80 ? 'text-success' : r.pct >= 50 ? 'text-primary' : ''}">${r.pct}%</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" style="width:${Math.min(100,r.pct)}%"></div>
-      </div>
-      <div class="progress-meta mt-4">
-        <span>${r.done} / ${r.goal}쪽</span>
-        <span>${r.pct < 60 ? '조정 필요' : '유지 가능'}</span>
-      </div>
-    </div>
-  `).join('');
+  // 과제 데이터 로드
+  try {
+    const allTasks = await getTasks();
+    const taskLogsAll = await Promise.all(
+      allTasks.map(t => Promise.all(weekDates.map(d => getTaskLog(t.id, d))))
+    );
+    taskResults = allTasks.map((task, ti) => {
+      const scheduledDays = weekDates.filter(d => (task.days || []).includes(new Date(d + 'T12:00:00').getDay()));
+      const doneDays = scheduledDays.filter((d, _) => {
+        const di = weekDates.indexOf(d);
+        const log = taskLogsAll[ti]?.[di] || {};
+        if (task.type === 'homework') return (log.percent || 0) >= 100;
+        return (log.checkedItems || []).length >= Math.max(1, (task.subItems || []).length);
+      });
+      const pct = scheduledDays.length > 0 ? Math.round(doneDays.length / scheduledDays.length * 100) : 0;
+      return { task, scheduledDays: scheduledDays.length, doneDays: doneDays.length, pct };
+    }).filter(r => r.scheduledDays > 0);
+  } catch(e) { taskResults = []; }
 
-  document.getElementById('reason-step').style.display = 'block';
-
-  Promise.all(activeBooks.map(book => getTotalCompleted(book.id))).then(totals => {
-    const completedIndex = totals.findIndex((totalDone, i) => totalDone >= activeBooks[i].totalPages);
-    if (completedIndex >= 0) {
-      const book = activeBooks[completedIndex];
-      document.getElementById('completion-cta').style.display = 'block';
-      document.querySelector('#completion-cta a').href = `report.html?bookId=${book.id}`;
-    }
-  }).catch(console.error);
+  renderWeekSummary();
+  renderStreak();
+  renderBookBreakdown();
+  renderTaskBreakdown();
 }
 
+// ────────────────────────────────────────
+// STEP 1 렌더
+// ────────────────────────────────────────
+function renderWeekSummary() {
+  const offset = 213.6 * (1 - Math.min(weekPct, 100) / 100);
+  const color  = weekPct >= 90 ? 'var(--success)' : weekPct >= 60 ? 'var(--primary)' : 'var(--danger)';
+  document.getElementById('ring-dash').style.strokeDashoffset = offset;
+  document.getElementById('ring-dash').style.stroke = color;
+  document.getElementById('ring-pct').textContent   = weekPct + '%';
+  document.getElementById('ring-title').textContent =
+    weekPct >= 90 ? '이번 주 작전 성공 🎉' :
+    weekPct >= 60 ? '절반 이상 해냈어 👍' :
+    weekPct >= 30 ? '힘들었지? 괜찮아' : '다시 작전을 짜보자';
+  document.getElementById('ring-sub').textContent = `목표 ${weekGoal}쪽 · 완료 ${weekDone}쪽`;
+}
+
+function renderStreak() {
+  const todayStr = today();
+  document.getElementById('streak-row').innerHTML = weekDates.map((d, i) => {
+    const label   = DAY_KO[new Date(d + 'T00:00:00').getDay()];
+    const dayGoal = bookResults.reduce((s, r) => s + (r.dayData[i]?.goal || 0), 0);
+    const dayDone = bookResults.reduce((s, r) => s + (r.dayData[i]?.done || 0), 0);
+    let cls;
+    if (d > todayStr)         cls = 'future';
+    else if (dayGoal === 0)   cls = 'rest';
+    else if (dayDone >= dayGoal * 0.8) cls = 'done';
+    else if (d === todayStr)  cls = 'today';
+    else                      cls = 'miss';
+    return `<div class="streak-dot ${cls}" title="${d}\n목표${dayGoal}쪽 완료${dayDone}쪽">${label}</div>`;
+  }).join('');
+}
+
+function renderBookBreakdown() {
+  document.getElementById('book-breakdown').innerHTML = bookResults.map(r => {
+    const color = r.pct >= 80 ? 'var(--success)' : r.pct >= 50 ? 'var(--primary)' : 'var(--danger)';
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="flex items-center justify-between mb-6">
+          <span class="text-sm font-semibold">[${r.book.subject}] ${r.book.title}</span>
+          <span class="text-sm font-bold" style="color:${color}">${r.pct}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${Math.min(100,r.pct)}%;background:${color}"></div>
+        </div>
+        <div class="progress-meta mt-4">
+          <span>${r.done} / ${r.goal}쪽</span>
+          <span style="color:${color}">${r.pct>=90?'완벽 🎯':r.pct>=70?'잘 하고 있어':r.pct>=50?'조정 고려':'작전 수정 필요'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderTaskBreakdown() {
+  const section = document.getElementById('task-breakdown');
+  const list    = document.getElementById('task-breakdown-list');
+  if (!taskResults.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = taskResults.map(r => {
+    const color = r.pct >= 80 ? 'var(--success)' : r.pct >= 50 ? 'var(--primary)' : 'var(--danger)';
+    const typeIcon = r.task.type === 'homework' ? '📋' : '🎬';
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div class="flex items-center justify-between mb-6">
+          <span class="text-sm font-semibold">${typeIcon} ${r.task.name}</span>
+          <span class="text-sm font-bold" style="color:${color}">${r.pct}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${Math.min(100,r.pct)}%;background:${color}"></div>
+        </div>
+        <div class="progress-meta mt-4">
+          <span>${r.doneDays} / ${r.scheduledDays}일</span>
+          <span style="color:${color}">${r.pct>=90?'완벽 🎯':r.pct>=70?'잘 하고 있어':r.pct>=50?'절반 이상':'더 힘내보자'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ────────────────────────────────────────
+// STEP 2: 자체 평가 선택 → AI 자동 호출
+// ────────────────────────────────────────
 function selectReason(el, val) {
   document.querySelectorAll('#reason-chips .chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected'); selectedReason = val;
-  document.getElementById('next-step').style.display = 'block';
-  document.getElementById('parent-coach').style.display = 'block';
-  document.getElementById('submit-btn').style.display = 'block';
-  const key = weekPct>=80?'high':weekPct>=50?'mid':'low';
-  document.getElementById('coach-message').innerHTML =
-    `이번 주 달성률 <strong>${weekPct}%</strong><br><br>` +
-    `아이에게: <em style="color:var(--success)">${COACH_MSG[key]}</em><br><br>` +
-    `이유: ${el.textContent} → ${REASON_MSG[val]}`;
+  el.classList.add('selected');
+  selectedReason = val;
+  // AI 분석 자동 시작
+  document.getElementById('step-ai').style.display = 'block';
+  document.getElementById('step-ai').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  requestAiAnalysis();
 }
 
-function selectNext(el, val) {
-  document.querySelectorAll('#next-chips .chip').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected'); selectedNext = val;
+// ────────────────────────────────────────
+// STEP 3: AI 분석
+// ────────────────────────────────────────
+async function requestAiAnalysis() {
+  const sec = document.getElementById('ai-section');
+  sec.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3)">
+    <span class="spinner-sm"></span> AI가 분석 중이야...
+  </div>`;
+  // STEP 4, 5 초기화
+  document.getElementById('step-adjust').style.display  = 'none';
+  document.getElementById('step-preview').style.display = 'none';
+
+  try {
+    const resp = await fetch(ANALYZE_MISSION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        period: 'week', weekPct, weekGoal, weekDone, reason: selectedReason,
+        books: bookResults.map(r => ({
+          title: r.book.title, subject: r.book.subject,
+          dailyPages: r.book.dailyPages || 0,
+          weekGoal: r.goal, weekDone: r.done, pct: r.pct,
+          totalPages: r.book.totalPages || 0,
+        })),
+        dayData: weekDates.map((d, i) => ({
+          dayLabel: DAY_KO[new Date(d + 'T00:00:00').getDay()],
+          goal: bookResults.reduce((s, r) => s + (r.dayData[i]?.goal || 0), 0),
+          done: bookResults.reduce((s, r) => s + (r.dayData[i]?.done || 0), 0),
+        })),
+      }),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(raw.slice(0, 200));
+    aiResult = JSON.parse(raw);
+
+    sec.innerHTML = `
+      <div class="ai-box">
+        <span class="ai-label">🤖 AI 분석</span>
+        ${escHtml(aiResult.analysis || '')}
+      </div>
+      ${aiResult.recommendation ? `
+      <div class="callout callout-primary mt-10" style="font-size:13px">
+        <strong>추천:</strong> ${escHtml(aiResult.recommendation)}
+      </div>` : ''}`;
+
+    // STEP 4 표시
+    renderBookAdjust(aiResult.situation || 'on_track');
+
+  } catch (e) {
+    sec.innerHTML = `
+      <p class="text-sm" style="color:var(--danger)">분석 실패: ${e.message || '다시 시도해줘'}</p>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="requestAiAnalysis()">다시 시도</button>`;
+  }
 }
 
+// ────────────────────────────────────────
+// STEP 4: 교재별 조정 카드
+// ────────────────────────────────────────
+function renderBookAdjust(situation) {
+  const list = document.getElementById('book-adjust-list');
+
+  list.innerHTML = bookResults.map(r => {
+    const current = r.book.dailyPages || Math.round(r.goal / Math.max(1, r.plan.dailyPages.filter(p=>p>0).length));
+
+    // AI 제안값 계산
+    let suggested = current;
+    if (situation === 'too_easy' || (selectedReason === 'too-easy' && r.pct >= 90)) {
+      suggested = current + 2;
+    } else if (situation === 'struggling' || ['too-much','hard','lazy'].includes(selectedReason)) {
+      if (r.pct < 70) suggested = Math.max(1, current - 1);
+    } else if (r.pct >= 95) {
+      suggested = current + 1;
+    } else if (r.pct < 50) {
+      suggested = Math.max(1, current - 1);
+    }
+
+    // 초기 조정값 세팅
+    bookAdjust[r.book.id] = suggested;
+
+    const pctCls = r.pct >= 80 ? 'good' : r.pct >= 50 ? 'mid' : 'bad';
+    const aiTag  = suggested > current ? '📈 늘리기 제안' :
+                   suggested < current ? '📉 줄이기 제안' : '✅ 유지 제안';
+
+    return `
+      <div class="book-adjust-card ${suggested !== current ? 'changed' : ''}" id="card-${r.book.id}">
+        <div class="book-adjust-header">
+          <div>
+            <div class="book-adjust-title">[${r.book.subject}] ${r.book.title}</div>
+            <div class="ai-suggest">이번 주 달성 <strong>${r.pct}%</strong> · AI: ${aiTag}</div>
+          </div>
+          <span class="book-adjust-pct ${pctCls}">${r.pct}%</span>
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+          <div class="stepper">
+            <button class="stepper-btn" onclick="changeAdjust('${r.book.id}', ${current}, -1)">−</button>
+            <div class="stepper-val" id="val-${r.book.id}">${suggested}</div>
+            <button class="stepper-btn" onclick="changeAdjust('${r.book.id}', ${current}, +1)">+</button>
+          </div>
+          <span class="stepper-unit">쪽/일</span>
+          <span class="stepper-diff ${suggested>current?'up':suggested<current?'down':'same'}" id="diff-${r.book.id}">
+            ${suggested > current ? `▲ ${suggested-current}쪽 증가` : suggested < current ? `▼ ${current-suggested}쪽 감소` : '변경 없음'}
+          </span>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:8px">현재: ${current}쪽/일</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('step-adjust').style.display = 'block';
+  renderPreview();
+  document.getElementById('step-preview').style.display = 'block';
+}
+
+function changeAdjust(bookId, original, delta) {
+  const current = bookAdjust[bookId] || original;
+  const next    = Math.max(1, current + delta);
+  bookAdjust[bookId] = next;
+
+  // 값 업데이트
+  document.getElementById('val-' + bookId).textContent = next;
+  const diffEl = document.getElementById('diff-' + bookId);
+  const card   = document.getElementById('card-' + bookId);
+  if (next > original) {
+    diffEl.textContent = `▲ ${next - original}쪽 증가`;
+    diffEl.className   = 'stepper-diff up';
+    card.classList.add('changed');
+  } else if (next < original) {
+    diffEl.textContent = `▼ ${original - next}쪽 감소`;
+    diffEl.className   = 'stepper-diff down';
+    card.classList.add('changed');
+  } else {
+    diffEl.textContent = '변경 없음';
+    diffEl.className   = 'stepper-diff same';
+    card.classList.remove('changed');
+  }
+  renderPreview();
+}
+
+// ────────────────────────────────────────
+// STEP 5: 변경사항 미리보기
+// ────────────────────────────────────────
+function renderPreview() {
+  document.getElementById('preview-list').innerHTML = bookResults.map(r => {
+    const original = r.book.dailyPages || Math.round(r.goal / Math.max(1, r.plan.dailyPages.filter(p=>p>0).length));
+    const adjusted = bookAdjust[r.book.id] ?? original;
+    const diff     = adjusted - original;
+    let badgeCls, badgeText, arrow;
+    if (diff > 0)      { badgeCls = 'up';   badgeText = `+${diff}쪽`;   arrow = '📈'; }
+    else if (diff < 0) { badgeCls = 'down'; badgeText = `${diff}쪽`;    arrow = '📉'; }
+    else               { badgeCls = 'same'; badgeText = '유지';          arrow = '✅'; }
+
+    return `
+      <div class="preview-row">
+        <div>
+          <div style="font-size:13px;font-weight:600">[${r.book.subject}] ${r.book.title}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px">
+            ${arrow} ${original}쪽/일 → <strong>${adjusted}쪽/일</strong>
+          </div>
+        </div>
+        <span class="preview-badge ${badgeCls}">${badgeText}</span>
+      </div>`;
+  }).join('');
+}
+
+// ────────────────────────────────────────
+// 긴급 작전지 감지
+// ────────────────────────────────────────
+function checkUrgent() {
+  const todayStr  = today();
+  const pastDates = weekDates.filter(d => d < todayStr);
+  if (pastDates.length < 2) return;
+  let consecutive = 0, maxConsec = 0;
+  // 책 등록일 중 가장 빠른 날짜 — 그 이전은 미달성 카운트에서 제외
+  const earliestStart = activeBooks.reduce((min, b) => {
+    const s = b.startDate || b.createdAt?.slice(0, 10);
+    return (!s || (min && min <= s)) ? min : s;
+  }, null);
+  for (const d of pastDates) {
+    if (earliestStart && d < earliestStart) continue; // 등록 전 날짜 무시
+    const i       = weekDates.indexOf(d);
+    const dayGoal = bookResults.reduce((s, r) => s + (r.dayData[i]?.goal || 0), 0);
+    const dayDone = bookResults.reduce((s, r) => s + (r.dayData[i]?.done || 0), 0);
+    if (dayGoal > 0 && dayDone === 0) { consecutive++; maxConsec = Math.max(maxConsec, consecutive); }
+    else consecutive = 0;
+  }
+  if (maxConsec < 2) return;
+  document.getElementById('urgent-alert').style.display = 'block';
+  document.getElementById('urgent-title').textContent =
+    maxConsec >= 3 ? `${maxConsec}일 연속 공부를 못 했어` : '2일 연속 목표를 못 채웠어';
+  document.getElementById('urgent-body').textContent =
+    maxConsec >= 3
+      ? '계획에 문제가 생긴 것 같아. 아래 평가를 골라서 AI 분석을 받아봐. 같이 작전을 다시 짜자.'
+      : '이틀 연속 빈 날이 생겼어. 이유가 뭔지 아래에서 골라봐.';
+}
+
+// ────────────────────────────────────────
+// 완주 확인
+// ────────────────────────────────────────
+async function checkCompletion() {
+  try {
+    const totals = await Promise.all(activeBooks.map(b => getTotalCompleted(b.id)));
+    const idx = totals.findIndex((t, i) => t >= activeBooks[i].totalPages);
+    if (idx >= 0) {
+      document.getElementById('completion-cta').style.display = 'block';
+      document.getElementById('completion-link').href = `report.html?bookId=${activeBooks[idx].id}`;
+    }
+  } catch {}
+}
+
+// ────────────────────────────────────────
+// 공유
+// ────────────────────────────────────────
+async function shareMission() {
+  const lines = [
+    `📋 작전회의 결과 (${weekDates[0]} 주간)`,
+    `📊 전체 달성률: ${weekPct}% (목표 ${weekGoal}쪽 중 ${weekDone}쪽)`,
+    '',
+  ];
+  bookResults.forEach(r => {
+    const original = r.book.dailyPages || 0;
+    const adjusted = bookAdjust[r.book.id] ?? original;
+    const diff     = adjusted - original;
+    const tag      = diff > 0 ? `📈 ${original}→${adjusted}쪽` : diff < 0 ? `📉 ${original}→${adjusted}쪽` : '✅ 유지';
+    lines.push(`· [${r.book.subject}] ${r.book.title}: ${r.pct}% · 다음주 ${tag}`);
+  });
+  if (aiResult?.analysis)      lines.push('', `🤖 AI: ${aiResult.analysis}`);
+  if (aiResult?.recommendation) lines.push(`💡 추천: ${aiResult.recommendation}`);
+  if (selectedReason) {
+    const MAP = {'too-easy':'너무 쉬웠다','just-right':'딱 맞았다','too-much':'양이 많았다','hard':'내용이 어려웠다','no-time':'시간 부족','lazy':'하기 싫었다','schedule':'일정이 많았다'};
+    lines.push('', `✏️ 본인 평가: ${MAP[selectedReason] || selectedReason}`);
+  }
+  lines.push('', '— 작전노트 앱');
+  const text = lines.join('\n');
+  if (navigator.share) {
+    try { await navigator.share({ title: '작전회의 결과', text }); return; } catch {}
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('클립보드에 복사됐어. 멘토에게 붙여넣기 해줘!');
+  } catch { showToast('공유 텍스트를 직접 복사해줘'); }
+}
+
+// ────────────────────────────────────────
+// 확정 저장
+// ────────────────────────────────────────
 async function submitReview() {
-  if (!selectedReason) { showToast('이유를 선택해 줘'); return; }
+  if (!selectedReason) { showToast('이번 주 평가를 먼저 선택해 줘'); return; }
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = '저장 중...';
-  const weekDates = getThisWeekDates();
+
   try {
+    // 리뷰 저장
     await db.collection('users').doc(getUserId())
-      .collection('weeklyReviews').doc(weekDates[0])
-      .set({
-        weekStart:weekDates[0], weekGoal, weekDone, weekPct,
-        reason:selectedReason, nextPlan:selectedNext,
-        books:bookResults.map(r => ({ bookId:r.book.id, title:r.book.title, subject:r.book.subject, goal:r.goal, done:r.done, pct:r.pct })),
-        savedAt:new Date().toISOString()
+      .collection('weeklyReviews').doc(weekDates[0]).set({
+        weekStart: weekDates[0], weekGoal, weekDone, weekPct,
+        reason: selectedReason,
+        aiSituation: aiResult?.situation || null,
+        books: bookResults.map(r => ({
+          bookId: r.book.id, title: r.book.title, subject: r.book.subject,
+          goal: r.goal, done: r.done, pct: r.pct,
+          originalDaily: r.book.dailyPages || 0,
+          adjustedDaily: bookAdjust[r.book.id] ?? r.book.dailyPages ?? 0,
+        })),
+        savedAt: new Date().toISOString(),
       });
-    if (selectedNext === 'less') {
-      const nextStart = (() => { const d=new Date(weekDates[0]); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
-      for (const r of bookResults) {
-        if (r.pct < 80) {
-          const np = r.plan.dailyPages.map(p=>p>0?Math.max(1,p-1):0);
-          await saveWeeklyPlan(r.book.id, nextStart, { weekStart:nextStart, dailyPages:np, weekGoal:np.reduce((a,b)=>a+b,0), adjustedFrom:'review' });
-        }
-      }
-    }
-    showToast('주간 점검 완료');
-    location.href='index.html';
-  } catch(e) { console.error(e); showToast('저장 실패'); btn.disabled=false; btn.textContent='주간 점검 완료'; }
+
+    // 교재별 다음 주 계획 적용
+    const nextStart = (() => { const d = new Date(weekDates[0]); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
+    await Promise.all(bookResults.map(async r => {
+      const newDaily = bookAdjust[r.book.id] ?? r.book.dailyPages ?? 0;
+      if (!newDaily) return;
+      // book 자체의 dailyPages 업데이트
+      await updateBook(r.book.id, { dailyPages: newDaily });
+      // 다음 주 계획 생성
+      const workDays = r.book.workDays || [1,2,4,5];
+      const np = weekDates.map((d, i) => {
+        // 다음 주 날짜로 계산
+        const nextDate = new Date(d); nextDate.setDate(nextDate.getDate()+7);
+        return workDays.includes(nextDate.getDay()) ? newDaily : 0;
+      });
+      await saveWeeklyPlan(r.book.id, nextStart, {
+        weekStart: nextStart,
+        dailyPages: np,
+        weekGoal: np.reduce((a,b)=>a+b,0),
+        adjustedFrom: 'review',
+      });
+    }));
+
+    showToast('작전 확정! 다음 주도 파이팅 🎯');
+    setTimeout(() => location.href = 'index.html', 1200);
+  } catch (e) {
+    console.error(e);
+    showToast('저장 실패: ' + (e.message || '다시 시도해줘'));
+    btn.disabled = false; btn.textContent = '이 계획으로 확정하기 →';
+  }
+}
+
+// ────────────────────────────────────────
+// 월간 뷰
+// ────────────────────────────────────────
+async function loadMonthView() {
+  const weeks = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(weekDates[0]); d.setDate(d.getDate() - i * 7);
+    weeks.push(d.toISOString().slice(0, 10));
+  }
+  const snap = await db.collection('users').doc(getUserId())
+    .collection('weeklyReviews').where('weekStart', 'in', weeks).get();
+  const reviewMap = {};
+  snap.docs.forEach(d => { reviewMap[d.data().weekStart] = d.data(); });
+  reviewMap[weekDates[0]] = { weekStart: weekDates[0], weekPct, weekGoal, weekDone };
+
+  // 막대 그래프
+  const bars = document.getElementById('month-bars');
+  bars.innerHTML = weeks.map(w => {
+    const rev = reviewMap[w]; const pct = rev?.weekPct || 0;
+    const color = pct>=80?'var(--success)':pct>=50?'var(--primary)':'var(--danger)';
+    const h = Math.max(4, Math.round(pct * 60 / 100));
+    return `<div class="month-bar-col">
+      <div class="month-bar-pct">${pct}%</div>
+      <div class="month-bar" style="height:${h}px;background:${color}"></div>
+    </div>`;
+  }).join('');
+  document.getElementById('month-bar-labels').innerHTML = weeks.map((_, i) =>
+    `<span style="flex:1;text-align:center">${i===3?'이번주':`${3-i}주전`}</span>`
+  ).join('');
+
+  const pcts = weeks.map(w => reviewMap[w]?.weekPct || 0);
+  const msg  = document.getElementById('month-trend-msg');
+  if (pcts[3] > pcts[2] + 10)      msg.textContent = '지난 주보다 많이 올랐어. 좋은 흐름이야 📈';
+  else if (pcts[3] < pcts[2] - 10) msg.textContent = '지난 주보다 떨어졌어. 이유를 같이 찾아보자 📉';
+  else                               msg.textContent = '비슷한 페이스를 유지하고 있어. 꾸준함이 실력이야 💪';
+
+  // 교재별
+  const avgByBook = {};
+  activeBooks.forEach(b => { avgByBook[b.id] = { title:b.title, subject:b.subject, pcts:[] }; });
+  weeks.forEach(w => {
+    (reviewMap[w]?.books || []).forEach(rb => {
+      if (avgByBook[rb.bookId]) avgByBook[rb.bookId].pcts.push(rb.pct);
+    });
+  });
+  document.getElementById('month-book-breakdown').innerHTML =
+    Object.values(avgByBook).map(b => {
+      const avg = b.pcts.length ? Math.round(b.pcts.reduce((a,c)=>a+c,0)/b.pcts.length) : 0;
+      return `
+        <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-sm font-semibold">[${b.subject}] ${b.title}</span>
+            <span class="text-sm font-bold" style="color:${avg>=70?'var(--success)':'var(--primary)'}">${avg}%</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,avg)}%"></div></div>
+          <div class="progress-meta mt-4"><span>최근 4주 평균</span><span>${avg>=80?'훌륭해 🎯':avg>=60?'선방 중':'조정 필요'}</span></div>
+        </div>`;
+    }).join('');
+}
+
+async function requestMonthlyAi() {
+  const sec = document.getElementById('month-ai-section');
+  sec.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3)"><span class="spinner-sm"></span> 분석 중...</div>`;
+  try {
+    const resp = await fetch(ANALYZE_MISSION_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ period:'month', weekPct, books: bookResults.map(r=>({ title:r.book.title,subject:r.book.subject,dailyPages:r.book.dailyPages||0,weekGoal:r.goal,weekDone:r.done,pct:r.pct })) }),
+    });
+    const result = JSON.parse(await resp.text());
+    sec.innerHTML = `
+      <div class="ai-box"><span class="ai-label">🤖 AI 월간 조언</span>${escHtml(result.analysis||'')}</div>
+      ${result.recommendation?`<div class="callout callout-primary mt-10" style="font-size:13px"><strong>추천:</strong> ${escHtml(result.recommendation)}</div>`:''}`;
+  } catch (e) {
+    sec.innerHTML = `<p class="text-sm" style="color:var(--danger)">${e.message}</p>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="requestMonthlyAi()">다시 시도</button>`;
+  }
+}
+
+// ────────────────────────────────────────
+// 기간 탭 전환
+// ────────────────────────────────────────
+async function switchPeriod(period) {
+  currentPeriod = period;
+  document.getElementById('tab-week').classList.toggle('active',  period==='week');
+  document.getElementById('tab-month').classList.toggle('active', period==='month');
+  document.getElementById('week-view').style.display  = period==='week'  ? 'block' : 'none';
+  document.getElementById('month-view').style.display = period==='month' ? 'block' : 'none';
+  if (period === 'month') await loadMonthView();
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
 requireAuth(() => init());

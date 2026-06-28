@@ -30,6 +30,10 @@
       {
         "source": "/api/analyzeToc",
         "function": "analyzeToc"
+      },
+      {
+        "source": "/api/analyzeMission",
+        "function": "analyzeMission"
       }
     ]
   },

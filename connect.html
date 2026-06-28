@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>멘토 연결 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  .conn-card { background:var(--surface-2); border-radius:var(--r); padding:16px; margin-bottom:10px; }
+  .conn-email { font-size:14px; font-weight:600; margin-bottom:4px; }
+  .conn-meta  { font-size:12px; color:var(--text-3); margin-bottom:12px; }
+  .conn-actions { display:flex; gap:8px; }
+  .badge-pending  { background:rgba(251,191,36,.15);  color:#fbbf24; border:1px solid rgba(251,191,36,.3); }
+  .badge-accepted { background:rgba(34,197,94,.12);   color:#22c55e; border:1px solid rgba(34,197,94,.3); }
+  .badge-rejected { background:rgba(239,68,68,.1);    color:#f87171; border:1px solid rgba(239,68,68,.2); }
+  .section-title { font-size:12px; font-weight:700; color:var(--text-3); letter-spacing:.04em; text-transform:uppercase; margin:20px 0 10px; }
+</style>
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title" id="page-title">멘토 연결</span>
+</header>
+
+<main class="container">
+
+  <!-- 요청 보내기 -->
+  <div class="card">
+    <div class="card-label" id="send-label">멘티 이메일로 연결 요청</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input class="form-input" type="email" id="target-email"
+        placeholder="example@email.com" style="flex:1">
+      <button class="btn btn-primary btn-sm" onclick="doRequest()" id="req-btn">요청</button>
+    </div>
+    <p class="text-xs text-3 mt-8" id="send-hint">상대방이 확인 후 수락하면 연결돼요</p>
+  </div>
+
+  <!-- 받은 요청 -->
+  <div id="pending-section" style="display:none">
+    <div class="section-title">받은 요청</div>
+    <div id="pending-list"></div>
+  </div>
+
+  <!-- 연결된 상대 -->
+  <div id="accepted-section" style="display:none">
+    <div class="section-title">연결된 <span id="connected-label">멘티</span></div>
+    <div id="accepted-list"></div>
+  </div>
+
+  <!-- 보낸 요청 (대기 중) -->
+  <div id="sent-section" style="display:none">
+    <div class="section-title">보낸 요청 (수락 대기)</div>
+    <div id="sent-list"></div>
+  </div>
+
+  <div id="loading-area" style="text-align:center;padding:40px 0;color:var(--text-3)">
+    <p class="text-sm">불러오는 중</p>
+  </div>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let myRole = 'mentee';
+
+const STATUS_LABEL = {
+  pending:  '대기 중',
+  accepted: '연결됨',
+  rejected: '거절됨',
+  revoked:  '해제됨',
+};
+
+async function init(user) {
+  const profile = await getUserProfile(user.uid);
+  myRole = profile?.role || 'mentee';
+
+  // UI 라벨 조정
+  if (myRole === 'mentor') {
+    document.getElementById('send-label').textContent = '멘티 이메일로 연결 요청';
+    document.getElementById('connected-label').textContent = '멘티';
+  } else {
+    document.getElementById('send-label').textContent = '멘토 이메일로 연결 요청';
+    document.getElementById('connected-label').textContent = '멘토';
+  }
+
+  await loadConnections();
+  document.getElementById('loading-area').style.display = 'none';
+}
+
+async function loadConnections() {
+  const uid = getUserId();
+  const conns = await getMyConnections();
+
+  // 받은 요청: 상대가 시작했고 내가 수락해야 하는 것
+  const pending = conns.filter(c => {
+    if (c.status !== 'pending') return false;
+    // 내가 받은 쪽: requestedBy가 나의 반대 역할
+    return (myRole === 'mentor' && c.requestedBy === 'mentee')
+        || (myRole === 'mentee' && c.requestedBy === 'mentor');
+  });
+
+  // 보낸 요청: 내가 시작
+  const sent = conns.filter(c =>
+    c.status === 'pending' &&
+    ((myRole === 'mentor' && c.requestedBy === 'mentor')
+  || (myRole === 'mentee' && c.requestedBy === 'mentee'))
+  );
+
+  // 연결된 것
+  const accepted = conns.filter(c => c.status === 'accepted');
+
+  // 받은 요청
+  const pendingEl = document.getElementById('pending-section');
+  if (pending.length) {
+    pendingEl.style.display = 'block';
+    document.getElementById('pending-list').innerHTML = pending.map(c => {
+      const counterEmail = myRole === 'mentor' ? c.menteeEmail : c.mentorEmail;
+      return `
+        <div class="conn-card">
+          <div class="conn-email">${counterEmail}</div>
+          <div class="conn-meta">연결 요청이 왔어요</div>
+          <div class="conn-actions">
+            <button class="btn btn-success btn-sm" onclick="doAccept('${c.id}')">수락</button>
+            <button class="btn btn-sm" style="background:var(--surface-3);color:var(--text-2)"
+              onclick="doReject('${c.id}')">거절</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // 연결된 상대
+  const acceptedEl = document.getElementById('accepted-section');
+  if (accepted.length) {
+    acceptedEl.style.display = 'block';
+    document.getElementById('accepted-list').innerHTML = accepted.map(c => {
+      const counterEmail = myRole === 'mentor' ? c.menteeEmail : c.mentorEmail;
+      const counterUid   = myRole === 'mentor' ? c.menteeUid  : c.mentorUid;
+      const goLink = myRole === 'mentor'
+        ? `<a href="mentor.html?menteeUid=${counterUid}" class="btn btn-primary btn-sm">대시보드 →</a>`
+        : '';
+      return `
+        <div class="conn-card">
+          <div class="conn-email">${counterEmail}</div>
+          <div class="conn-meta"><span class="badge badge-accepted">${STATUS_LABEL.accepted}</span></div>
+          <div class="conn-actions">
+            ${goLink}
+            <button class="btn btn-sm" style="background:var(--surface-3);color:var(--text-3);font-size:12px"
+              onclick="doRevoke('${c.id}')">연결 해제</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // 보낸 요청
+  const sentEl = document.getElementById('sent-section');
+  if (sent.length) {
+    sentEl.style.display = 'block';
+    document.getElementById('sent-list').innerHTML = sent.map(c => {
+      const counterEmail = myRole === 'mentor' ? c.menteeEmail : c.mentorEmail;
+      return `
+        <div class="conn-card">
+          <div class="conn-email">${counterEmail}</div>
+          <div class="conn-meta"><span class="badge badge-pending">${STATUS_LABEL.pending}</span> — 상대방 확인 대기 중</div>
+          <div class="conn-actions">
+            <button class="btn btn-sm" style="background:var(--surface-3);color:var(--text-3);font-size:12px"
+              onclick="doRevoke('${c.id}')">요청 취소</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+async function doRequest() {
+  const email = document.getElementById('target-email').value.trim();
+  if (!email) return;
+  const btn = document.getElementById('req-btn');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await sendConnectionRequest(email);
+    document.getElementById('target-email').value = '';
+    // 목록 새로고침
+    document.getElementById('pending-section').style.display = 'none';
+    document.getElementById('accepted-section').style.display = 'none';
+    document.getElementById('sent-section').style.display = 'none';
+    document.getElementById('pending-list').innerHTML = '';
+    document.getElementById('accepted-list').innerHTML = '';
+    document.getElementById('sent-list').innerHTML = '';
+    await loadConnections();
+    alert('요청을 보냈어요! 상대방이 수락하면 연결돼요.');
+  } catch(e) {
+    alert(e.message || '요청 실패');
+  }
+  btn.disabled = false; btn.textContent = '요청';
+}
+
+async function doAccept(connId) {
+  await acceptConnection(connId);
+  location.reload();
+}
+
+async function doReject(connId) {
+  await rejectConnection(connId);
+  location.reload();
+}
+
+async function doRevoke(connId) {
+  if (!confirm('연결을 해제할까요?')) return;
+  await revokeConnection(connId);
+  location.reload();
+}
+
+requireAuth(user => init(user));
+</script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>책 읽고 이야기하기 — 작전노트</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── 업로드 영역 ── */
+.upload-area {
+  border:2px dashed var(--surface-3); border-radius:var(--r);
+  padding:40px 20px; text-align:center; cursor:pointer;
+  transition:border-color .15s;
+}
+.upload-area:hover, .upload-area.drag { border-color:var(--primary); }
+.upload-area input { display:none; }
+.upload-icon { font-size:48px; margin-bottom:12px; }
+.upload-title { font-size:15px; font-weight:700; margin-bottom:6px; }
+.upload-hint  { font-size:12px; color:var(--text-3); }
+
+/* ── 책 정보 카드 ── */
+.book-info-card { background:var(--surface-2); border-radius:var(--r); padding:20px; }
+.book-title-text { font-size:18px; font-weight:800; margin-bottom:4px; }
+.book-author-text { font-size:13px; color:var(--text-3); }
+.search-snippet { font-size:12px; color:var(--text-2); line-height:1.6;
+  margin-top:12px; padding-top:12px; border-top:1px solid var(--surface-3); }
+
+/* ── 채팅 UI ── */
+.chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 130px); }
+.chat-messages { flex:1; overflow-y:auto; padding:0 0 8px; }
+.bubble { max-width:82%; padding:10px 14px; border-radius:18px;
+  font-size:14px; line-height:1.6; margin-bottom:8px; }
+.bubble-ai   { background:var(--surface-2); border-bottom-left-radius:4px; align-self:flex-start; }
+.bubble-user { background:var(--primary); color:#fff; border-bottom-right-radius:4px;
+  align-self:flex-end; margin-left:auto; }
+.chat-input-row { display:flex; gap:8px; padding:10px 0; border-top:1px solid var(--surface-3); }
+.chat-input { flex:1; border:1.5px solid var(--surface-3); border-radius:22px;
+  padding:10px 16px; font-size:14px; font-family:inherit; resize:none;
+  background:var(--surface-1); color:var(--text-1); outline:none; }
+.chat-input:focus { border-color:var(--primary); }
+.send-btn { width:44px; height:44px; border-radius:50%; background:var(--primary);
+  border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; }
+.send-btn:disabled { opacity:.4; cursor:default; }
+.typing-indicator { display:flex; gap:4px; align-items:center; padding:10px 14px; }
+.typing-dot { width:7px; height:7px; border-radius:50%; background:var(--text-3);
+  animation:typing 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay:.2s; }
+.typing-dot:nth-child(3) { animation-delay:.4s; }
+@keyframes typing { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+</style>
+</head>
+<body>
+<header class="nav-bar">
+  <button class="nav-back" onclick="goBack()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title" id="page-title">책 읽고 이야기하기</span>
+  <div></div>
+</header>
+
+<main class="container" id="main">
+
+  <!-- STEP 1: 업로드 -->
+  <div id="step-upload">
+    <div class="card-label mt-8 mb-16">읽은 책 표지를 찍어줘</div>
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*" onchange="handleFile(this)">
+      <div class="upload-icon">📸</div>
+      <div class="upload-title">표지 사진 선택</div>
+      <div class="upload-hint">카메라로 찍거나 갤러리에서 골라봐</div>
+    </div>
+    <button class="btn btn-primary btn-lg w-full mt-16"
+      onclick="document.getElementById('file-input').click()">
+      📷 사진 찍기 / 선택하기
+    </button>
+  </div>
+
+  <!-- STEP 2: 분석 중 -->
+  <div id="step-analyzing" style="display:none;text-align:center;padding:60px 0">
+    <div style="font-size:48px;margin-bottom:16px">📖</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:8px">책 정보를 찾는 중...</div>
+    <div style="font-size:13px;color:var(--text-3)">표지를 인식하고 웹에서 검색하고 있어</div>
+    <div class="progress-track mt-16"><div class="progress-fill" id="analyze-progress" style="width:0%;transition:width 2s ease"></div></div>
+  </div>
+
+  <!-- STEP 3: 책 확인 -->
+  <div id="step-confirm" style="display:none">
+    <div class="card-label mt-8 mb-12">이 책 맞아?</div>
+    <div class="book-info-card mb-16">
+      <div class="book-title-text" id="confirm-title"></div>
+      <div class="book-author-text" id="confirm-author"></div>
+      <div class="search-snippet" id="confirm-snippet"></div>
+    </div>
+    <button class="btn btn-primary btn-lg w-full mb-8" onclick="startChat()">
+      맞아, 대화 시작! 💬
+    </button>
+    <button class="btn btn-ghost btn-lg w-full" onclick="resetUpload()">
+      다른 책이야, 다시 찍을게
+    </button>
+  </div>
+
+  <!-- STEP 4: 채팅 -->
+  <div id="step-chat" style="display:none">
+    <div class="chat-wrap">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" rows="1"
+          placeholder="메시지를 입력해봐..."
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="#fff" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const FUNC_BASE = 'https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net'; // firebase-config.js의 projectId로 교체 예정
+let chatId = null, isWaiting = false;
+
+function goBack() {
+  const step = getVisibleStep();
+  if (step === 'chat') { if(confirm('대화를 나가면 저장된 내역은 보관돼. 나갈게?')) location.href='reading.html'; }
+  else history.back();
+}
+
+function getVisibleStep() {
+  for(const id of ['upload','analyzing','confirm','chat']) {
+    if(document.getElementById('step-'+id).style.display !== 'none') return id;
+  }
+}
+
+function showStep(name) {
+  ['upload','analyzing','confirm','chat'].forEach(s =>
+    document.getElementById('step-'+s).style.display = s===name ? '' : 'none'
+  );
+}
+
+// ── 파일 업로드 ──────────────────────────────────────
+async function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const base64 = await toBase64(file);
+  analyzeBook(base64);
+}
+
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function resetUpload() {
+  document.getElementById('file-input').value = '';
+  showStep('upload');
+}
+
+// ── 분석 ─────────────────────────────────────────────
+async function analyzeBook(imageBase64) {
+  showStep('analyzing');
+  // 프로그레스바 애니메이션
+  setTimeout(() => document.getElementById('analyze-progress').style.width = '70%', 100);
+
+  try {
+    const projectId = firebase.app().options.projectId;
+    const res = await fetch(`https://us-central1-${projectId}.cloudfunctions.net/analyzeReading`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'book', imageBase64, uid: USER_ID }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '분석 실패');
+
+    chatId = data.chatId;
+    document.getElementById('analyze-progress').style.width = '100%';
+
+    // 책 정보 표시
+    document.getElementById('confirm-title').textContent  = data.bookTitle;
+    document.getElementById('confirm-author').textContent = data.bookAuthor ? `저자: ${data.bookAuthor}` : '';
+    const snippet = data.searchResults?.[0]?.snippet || '';
+    document.getElementById('confirm-snippet').textContent = snippet;
+
+    setTimeout(() => {
+      showStep('confirm');
+      // 첫 메시지 준비
+      window._firstMessage = data.firstMessage;
+    }, 400);
+
+  } catch(e) {
+    showStep('upload');
+    showToast('😅 ' + (e.message || '분석에 실패했어. 다시 시도해봐'));
+  }
+}
+
+// ── 채팅 시작 ─────────────────────────────────────────
+function startChat() {
+  showStep('chat');
+  document.getElementById('page-title').textContent =
+    document.getElementById('confirm-title').textContent || '책 대화';
+  if (window._firstMessage) addBubble('ai', window._firstMessage);
+  document.getElementById('chat-input').focus();
+}
+
+// ── 메시지 전송 ───────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const msg   = input.value.trim();
+  if (!msg || isWaiting) return;
+  input.value = ''; autoResize(input);
+  addBubble('user', msg);
+  isWaiting = true;
+  document.getElementById('send-btn').disabled = true;
+  const typingId = addTyping();
+
+  try {
+    const projectId = firebase.app().options.projectId;
+    const res = await fetch(`https://us-central1-${projectId}.cloudfunctions.net/readingChat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId, message: msg, uid: USER_ID }),
+    });
+    const data = await res.json();
+    removeTyping(typingId);
+    if (!res.ok) throw new Error(data.error || '오류');
+    addBubble('ai', data.reply);
+  } catch(e) {
+    removeTyping(typingId);
+    addBubble('ai', '😅 잠깐 문제가 생겼어. 다시 보내봐!');
+  } finally {
+    isWaiting = false;
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function addBubble(role, text) {
+  const wrap = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.style.display = 'flex';
+  div.innerHTML = `<div class="bubble bubble-${role}">${text.replace(/\n/g,'<br>')}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function addTyping() {
+  const wrap = document.getElementById('chat-messages');
+  const id   = 'typing-' + Date.now();
+  const div  = document.createElement('div');
+  div.id     = id;
+  div.style.display = 'flex';
+  div.innerHTML = `<div class="bubble bubble-ai"><div class="typing-indicator">
+    <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+  </div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  document.getElementById(id)?.remove();
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── 이전 대화 이어서 ─────────────────────────────────
+async function loadExistingChat(id) {
+  chatId = id;
+  try {
+    const doc = await db.collection('users').doc(USER_ID)
+      .collection('readingChats').doc(id).get();
+    if (!doc.exists) { showStep('upload'); return; }
+    const data = doc.data();
+    document.getElementById('page-title').textContent = data.bookTitle || '책 대화';
+    showStep('chat');
+    (data.messages || []).forEach(m => addBubble(m.role === 'assistant' ? 'ai' : 'user', m.content));
+  } catch(e) { showStep('upload'); }
+}
+
+requireAuth(() => {
+  const params = new URLSearchParams(location.search);
+  const existingId = params.get('chatId');
+  if (existingId) loadExistingChat(existingId);
+  else showStep('upload');
+});
+</script>
+</body>
+</html>

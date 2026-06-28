@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>독서 책 추가 — 작전노트</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
+<style>
+  .genre-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
+  .genre-btn { padding:10px 6px; border:2px solid var(--surface-3); border-radius:var(--r);
+    background:var(--surface-2); font-size:13px; font-weight:600; cursor:pointer;
+    color:var(--text-2); text-align:center; font-family:inherit; transition:all .15s; }
+  .genre-btn.selected { border-color:var(--primary); color:var(--primary); background:rgba(99,102,241,.08); }
+  .cover-upload { width:100%; aspect-ratio:3/4; max-width:140px; border:2px dashed var(--surface-3);
+    border-radius:var(--r); display:flex; flex-direction:column; align-items:center;
+    justify-content:center; cursor:pointer; background:var(--surface-2); overflow:hidden; position:relative; }
+  .cover-upload img { width:100%; height:100%; object-fit:cover; }
+  .cover-upload-placeholder { text-align:center; color:var(--text-3); }
+</style>
+</head>
+<body>
+
+<header class="nav-bar">
+  <button class="nav-back" onclick="history.back()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="nav-title">책 추가</span>
+</header>
+
+<main class="container">
+
+  <!-- 표지 업로드 -->
+  <div class="form-group" style="display:flex;justify-content:center;margin-bottom:20px">
+    <label class="cover-upload" id="cover-label" for="cover-input">
+      <div class="cover-upload-placeholder" id="cover-placeholder">
+        <div style="font-size:28px;margin-bottom:6px">📷</div>
+        <div style="font-size:12px">표지 사진<br>(선택)</div>
+      </div>
+      <img id="cover-preview" style="display:none">
+    </label>
+    <input type="file" id="cover-input" accept="image/*" style="display:none" onchange="previewCover(this)">
+  </div>
+
+  <!-- 제목 -->
+  <div class="form-group">
+    <label class="form-label">책 제목 <span style="color:var(--primary)">*</span></label>
+    <input class="form-input" type="text" id="book-title" placeholder="예: 어린 왕자">
+  </div>
+
+  <!-- 저자 -->
+  <div class="form-group">
+    <label class="form-label">저자 <span class="text-3">(선택)</span></label>
+    <input class="form-input" type="text" id="book-author" placeholder="예: 생텍쥐페리">
+  </div>
+
+  <!-- 총 쪽수 -->
+  <div class="form-group">
+    <label class="form-label">총 쪽수 <span class="text-3">(선택 — 진행률 표시에 사용)</span></label>
+    <input class="form-input" type="number" id="book-pages" placeholder="예: 200" min="1">
+  </div>
+
+  <!-- 장르 -->
+  <div class="form-group">
+    <label class="form-label">장르</label>
+    <div class="genre-grid">
+      <button class="genre-btn selected" onclick="selectGenre(this,'소설')">📚 소설</button>
+      <button class="genre-btn" onclick="selectGenre(this,'동화')">🧚 동화</button>
+      <button class="genre-btn" onclick="selectGenre(this,'과학')">🔬 과학</button>
+      <button class="genre-btn" onclick="selectGenre(this,'역사')">🏛️ 역사</button>
+      <button class="genre-btn" onclick="selectGenre(this,'자기계발')">💡 자기계발</button>
+      <button class="genre-btn" onclick="selectGenre(this,'기타')">📖 기타</button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary btn-lg mt-8" style="width:100%" onclick="registerBook()">
+    독서 시작하기
+  </button>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+let selectedGenre = '소설';
+let coverFile = null;
+
+function selectGenre(el, genre) {
+  document.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedGenre = genre;
+}
+
+function previewCover(input) {
+  if (!input.files[0]) return;
+  coverFile = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('cover-preview').src = e.target.result;
+    document.getElementById('cover-preview').style.display = 'block';
+    document.getElementById('cover-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(coverFile);
+}
+
+async function uploadCover(bookId) {
+  if (!coverFile) return null;
+  const uid = getUserId();
+  const storage = firebase.storage();
+  const ref = storage.ref(`users/${uid}/reading-covers/${bookId}`);
+  await ref.put(coverFile);
+  return await ref.getDownloadURL();
+}
+
+async function registerBook() {
+  const title = document.getElementById('book-title').value.trim();
+  if (!title) { alert('책 제목을 입력해주세요.'); return; }
+
+  const btn = document.querySelector('.btn-primary');
+  btn.disabled = true; btn.textContent = '등록 중...';
+
+  try {
+    // 먼저 책 저장 (id 확보)
+    const totalPages = parseInt(document.getElementById('book-pages').value) || 0;
+    const bookId = await saveReadingBook({
+      title,
+      author: document.getElementById('book-author').value.trim(),
+      genre: selectedGenre,
+      totalPages,
+      currentPage: 0,
+      status: 'reading',
+      coverUrl: null,
+    });
+
+    // 표지 업로드
+    if (coverFile) {
+      const coverUrl = await uploadCover(bookId);
+      await updateReadingBook(bookId, { coverUrl });
+    }
+
+    location.href = 'reading.html';
+  } catch(e) {
+    alert('등록 실패: ' + e.message);
+    btn.disabled = false; btn.textContent = '독서 시작하기';
+  }
+}
+
+requireAuth(() => {});
+</script>
+</body>
+</html>

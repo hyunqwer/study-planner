@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>오늘의 미션 — 작전노트</title>
-<link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -24,13 +30,23 @@
 
   <div id="main-content" style="display:none">
 
-    <p class="text-sm text-3 mb-16" id="today-label"></p>
+    <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:16px">
+      <button onclick="shiftDate(-1)"
+        style="background:none;border:none;cursor:pointer;padding:4px 10px;color:var(--text-2);font-size:20px;line-height:1">‹</button>
+      <span class="text-sm text-3" id="today-label"></span>
+      <button id="date-nav-next" onclick="shiftDate(1)"
+        style="background:none;border:none;cursor:pointer;padding:4px 10px;color:var(--text-2);font-size:20px;line-height:1">›</button>
+    </div>
 
-    <!-- 여러 교재 미션 목록 -->
+    <!-- 오늘 할 일 (교재 + 과제 통합) -->
     <div id="mission-list-section" style="display:none">
       <div class="card">
-        <div class="card-label">오늘 미션</div>
+        <div class="flex items-center justify-between mb-12">
+          <div class="card-label" style="margin-bottom:0">오늘의 과제</div>
+          <span class="text-xs text-3" id="today-done-badge"></span>
+        </div>
         <div id="mission-list"></div>
+        <div id="task-items" style="margin-top:4px"></div>
       </div>
     </div>
 
@@ -58,9 +74,14 @@
 
     <!-- 휴식일 -->
     <div id="rest-section" style="display:none">
-      <div class="card text-center" style="padding:36px 24px">
-        <h3 class="mb-8">오늘은 휴식일</h3>
-        <p class="text-sm text-2">잘 쉬고 내일 다시 시작해</p>
+      <div class="card text-center" style="padding:32px 24px">
+        <div style="font-size:32px;margin-bottom:12px">😴</div>
+        <h3 class="mb-8" id="rest-title">오늘은 휴식일</h3>
+        <p class="text-sm text-2 mb-16" id="rest-sub">잘 쉬고 내일 다시 시작해</p>
+        <button class="btn btn-ghost btn-sm" onclick="recordOnRestDay()"
+          style="border:1.5px solid var(--primary);color:var(--primary)">
+          📝 추가 기록하기
+        </button>
       </div>
     </div>
 
@@ -121,6 +142,7 @@
     </div>
 
   </div>
+
 </main>
 
 <nav class="bottom-nav">
@@ -130,6 +152,10 @@
   <a href="mission.html" data-page="mission" class="active">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>미션
   </a>
+    <a href="reading.html" data-page="reading">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    독서
+  </a>
   <a href="weekly.html" data-page="weekly">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>작전표
   </a>
@@ -137,7 +163,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>점검
   </a>
   <a href="bookshelf.html" data-page="books">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>책장
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>학습관리
   </a>
 </nav>
 
@@ -175,6 +201,27 @@ function formatMissionDate(dateStr) {
 }
 
 document.getElementById('today-label').textContent = formatMissionDate(selectedDateStr);
+
+// 오늘이면 다음 버튼 비활성화
+(function() {
+  const nextBtn = document.getElementById('date-nav-next');
+  if (selectedDateStr >= today()) {
+    nextBtn.disabled = true;
+    nextBtn.style.opacity = '0.25';
+    nextBtn.style.cursor = 'default';
+  }
+})();
+
+function shiftDate(delta) {
+  const d = new Date(selectedDateStr + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  const newDate = d.toISOString().slice(0, 10);
+  if (newDate > today()) return;
+  const bookId = getParam('bookId');
+  const params = new URLSearchParams({ date: newDate });
+  if (bookId) params.set('bookId', bookId);
+  location.href = `mission.html?${params.toString()}`;
+}
 document.getElementById('action-title').textContent = `${dateWord} 어디까지 했어?`;
 document.getElementById('pages-calc-label').textContent = dateWord;
 document.getElementById('skip-title').textContent = `${dateWord} 못 한 이유`;
@@ -265,7 +312,7 @@ async function submitMission() {
   const wasEditing = !!currentLog;
   const nextLog = {
     date: selectedDateStr,
-    status: completedPages >= todayPlannedPages ? 'done' : 'partial',
+    status: todayPlannedPages === 0 ? 'extra' : completedPages >= todayPlannedPages ? 'done' : 'partial',
     plannedPages: todayPlannedPages,
     completedPages,
     startPage,
@@ -308,9 +355,11 @@ async function submitSkip() {
 
 async function renderMissionList(books) {
   const weekDates = getThisWeekDates();
-  const todayIdx = weekIndexForToday();
-  const todayStr = today();
-  const rows = [];
+  const todayIdx  = weekIndexForToday();
+  const todayStr  = today();
+  const dow       = todayDow(); // KST 기준 요일
+
+  // 교재 상태 수집
   const bookStates = await Promise.all(books.map(async book => {
     const [plan, logs] = await Promise.all([
       getOrCreateWeeklyPlan(book, weekDates),
@@ -319,32 +368,100 @@ async function renderMissionList(books) {
     return { book, plan, log: logs[todayStr] };
   }));
 
-  for (const { book, plan, log } of bookStates) {
+  // 교재 행 렌더
+  const bookRows = bookStates.map(({ book, plan, log }) => {
     const planned = plan.dailyPages[todayIdx] || 0;
-    const badge = planned === 0
-      ? '<span class="badge badge-muted">휴식</span>'
-      : log && log.status === 'done'
-        ? '<span class="badge badge-success">완료</span>'
-        : log && log.status === 'partial'
-          ? '<span class="badge badge-accent">일부</span>'
-          : log && log.status === 'skip'
-            ? '<span class="badge badge-muted">미완</span>'
-            : '<span class="badge badge-primary">기록하기</span>';
-    rows.push(`
-      <div class="list-item" onclick="location.href='mission.html?bookId=${book.id}'">
-        <div class="list-item-icon">${book.subject?.slice(0, 1) || '책'}</div>
+    const isDone  = log && (log.status === 'done' || log.status === 'partial');
+    const badge   = planned === 0
+      ? (log?.status === 'extra' ? '<span class="badge badge-success">추가기록</span>' : '<span class="badge badge-muted">휴식</span>')
+      : log?.status === 'done'    ? '<span class="badge badge-success">완료</span>'
+      : log?.status === 'partial' ? '<span class="badge badge-accent">일부</span>'
+      : log?.status === 'skip'    ? '<span class="badge badge-muted">미완</span>'
+      :                             '<span class="badge badge-primary">기록하기</span>';
+    return `
+      <div class="list-item" style="border-bottom:1px solid var(--surface-3)"
+        onclick="location.href='mission.html?bookId=${book.id}'">
+        <div class="list-item-icon" style="font-size:15px">${book.subject?.slice(0,1)||'📖'}</div>
         <div class="list-item-body">
           <div class="list-item-title">[${book.subject}] ${book.title}</div>
-          <div class="list-item-sub">${planned > 0 ? `오늘 ${planned}쪽 · 예상 ${Math.ceil(planned * 5)}분` : '오늘은 쉬는 날'}</div>
+          <div class="list-item-sub">${planned>0?`오늘 ${planned}쪽 · 예상 ${Math.ceil(planned*5)}분`:'오늘은 쉬는 날'}</div>
           <div class="mt-8">${badge}</div>
         </div>
-        <div class="list-item-arrow">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-      </div>
-    `);
-  }
-  document.getElementById('mission-list').innerHTML = rows.join('');
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);flex-shrink:0">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>`;
+  }).join('');
+
+  // 과제 행 렌더 (inline)
+  let taskRows = '';
+  try {
+    const tasks = await getTasksForDay(dow);
+    if (tasks.length) {
+      const taskLogs = await Promise.all(tasks.map(t => getTaskLog(t.id, todayStr)));
+      taskRows = tasks.map((task, i) => {
+        const log = taskLogs[i] || {};
+        if (task.type === 'homework') {
+          const pct = log.percent ?? 0;
+          return `
+          <div style="padding:12px 0;border-bottom:1px solid var(--surface-3)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700">📋 ${task.name}</div>
+                <div style="font-size:11px;color:var(--text-3)">주간 숙제 · 진행률 체크</div>
+              </div>
+              <span class="badge ${pct>=100?'badge-success':'badge-primary'}" id="hw-badge-${task.id}">${pct}%</span>
+            </div>
+            <input type="range" min="0" max="100" step="10" value="${pct}"
+              style="width:100%;accent-color:var(--primary)"
+              oninput="updateHomeworkPct('${task.id}',this.value)"
+              onchange="saveHomework('${task.id}',this.value)">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-3);margin-top:2px">
+              <span>0%</span><span>50%</span><span>100%</span>
+            </div>
+          </div>`;
+        } else {
+          const subItems = task.subItems?.length ? task.subItems : [task.name];
+          const checked = log.checkedItems || [];
+          const rows = subItems.map((item, j) => `
+            <label style="display:flex;align-items:center;gap:10px;padding:7px 0;
+              border-bottom:1px solid var(--surface-3);cursor:pointer">
+              <input type="checkbox" ${checked.includes(j)?'checked':''}
+                data-taskid="${task.id}" data-idx="${j}"
+                onchange="saveLessonCheck('${task.id}',${JSON.stringify(subItems)})"
+                style="width:18px;height:18px;accent-color:var(--primary);flex-shrink:0">
+              <span style="font-size:13px">${item}</span>
+            </label>`).join('');
+          const allDone = checked.length >= subItems.length;
+          return `
+          <div style="padding:12px 0;border-bottom:1px solid var(--surface-3)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div>
+                <div style="font-size:13px;font-weight:700">🎬 ${task.name}</div>
+                <div style="font-size:11px;color:var(--text-3)">강의/학습앱</div>
+              </div>
+              <span class="badge ${allDone?'badge-success':'badge-muted'}" id="lesson-badge-${task.id}">
+                ${checked.length}/${subItems.length}
+              </span>
+            </div>
+            ${rows}
+          </div>`;
+        }
+      }).join('');
+    }
+  } catch(e) { console.warn('task render error', e); }
+
+  document.getElementById('mission-list').innerHTML = bookRows;
+  document.getElementById('task-items').innerHTML   = taskRows;
+
+  // 완료 배지
+  const totalBooks = bookStates.length;
+  const doneBooks  = bookStates.filter(s => s.log && ['done','partial'].includes(s.log.status)).length;
+  document.getElementById('today-done-badge').textContent =
+    totalBooks > 0 ? `교재 ${doneBooks}/${totalBooks}` : '';
+
   document.getElementById('mission-list-section').style.display = 'block';
   document.getElementById('mission-header').style.display = 'none';
 }
@@ -386,9 +503,14 @@ async function init() {
   }
 
   if (todayPlannedPages === 0) {
-    document.getElementById('mission-main-title').textContent = '이날은 휴식일';
-    document.getElementById('mission-sub').textContent =
-      dateWord === '오늘' ? '내일 다시 시작' : '다음 공부일에 다시 시작';
+    // 휴식일이지만 이미 기록한 경우
+    if (todayLog && (todayLog.status === 'done' || todayLog.status === 'partial' || todayLog.status === 'extra')) {
+      showCompletedState(todayLog);
+      return;
+    }
+    const isToday = dateWord === '오늘';
+    document.getElementById('mission-main-title').textContent = isToday ? '오늘은 휴식일' : '이날은 휴식일';
+    document.getElementById('mission-sub').textContent = isToday ? '내일 다시 시작' : '다음 공부일에 다시 시작';
     document.getElementById('rest-section').style.display = 'block';
     return;
   }
@@ -407,6 +529,99 @@ async function init() {
     updateCalc();
   }
 }
+function recordOnRestDay() {
+  // 휴식일에도 기록 허용 — plannedPages를 0으로 유지하고 action-section 열기
+  document.getElementById('rest-section').style.display = 'none';
+  document.getElementById('action-title').textContent = '오늘 어디까지 읽었어?';
+  document.getElementById('action-section').style.display = 'block';
+  // 헤더 업데이트
+  document.getElementById('mission-main-title').textContent = '추가 기록';
+  document.getElementById('mission-sub').textContent =
+    `[${currentBook.subject}] ${currentBook.title}`;
+}
+
+// ── 과제 섹션 ──────────────────────────────────
+async function loadTodayTasks() {
+  try {
+    const dow = new Date(selectedDateStr + 'T12:00:00').getDay(); // 0=일..6=토
+    const tasks = await getTasksForDay(dow);
+    if (!tasks.length) return;
+
+    document.getElementById('task-section').style.display = 'block';
+    const logs = await Promise.all(tasks.map(t => getTaskLog(t.id, selectedDateStr)));
+
+    const items = document.getElementById('task-items');
+    items.innerHTML = tasks.map((task, i) => {
+      const log = logs[i] || {};
+      if (task.type === 'homework') {
+        const pct = log.percent ?? 0;
+        return `
+        <div class="card mb-8" id="task-card-${task.id}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:14px;font-weight:700">${task.name}</span>
+            <span class="badge ${pct>=100?'badge-success':'badge-primary'}" id="hw-badge-${task.id}">${pct}%</span>
+          </div>
+          <input type="range" min="0" max="100" step="10" value="${pct}"
+            style="width:100%;accent-color:var(--primary)"
+            oninput="updateHomeworkPct('${task.id}',this.value)"
+            onchange="saveHomework('${task.id}',this.value)">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:4px">
+            <span>0%</span><span>50%</span><span>100%</span>
+          </div>
+        </div>`;
+      } else {
+        // lesson type — checkboxes for sub-items (or whole task if no sub-items)
+        const subItems = task.subItems && task.subItems.length ? task.subItems : [task.name];
+        const checked = log.checkedItems || [];
+        const rows = subItems.map((item, j) => {
+          const isChecked = checked.includes(j);
+          return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface-3);cursor:pointer">
+            <input type="checkbox" ${isChecked?'checked':''} data-taskid="${task.id}" data-idx="${j}"
+              onchange="saveLessonCheck('${task.id}',${JSON.stringify(subItems)})"
+              style="width:18px;height:18px;accent-color:var(--primary)">
+            <span style="font-size:14px">${item}</span>
+          </label>`;
+        }).join('');
+        const totalDone = checked.length;
+        const total = subItems.length;
+        const allDone = totalDone >= total;
+        return `
+        <div class="card mb-8" id="task-card-${task.id}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:14px;font-weight:700">${task.type==='lesson'&&task.subItems?.length?task.name:''}</span>
+            <span class="badge ${allDone?'badge-success':'badge-muted'}" id="lesson-badge-${task.id}">${totalDone}/${total}</span>
+          </div>
+          ${rows}
+        </div>`;
+      }
+    }).join('');
+  } catch(e) { console.warn('loadTodayTasks err', e); }
+}
+
+function updateHomeworkPct(taskId, val) {
+  const badge = document.getElementById('hw-badge-' + taskId);
+  if (badge) { badge.textContent = val + '%'; badge.className = 'badge ' + (val>=100?'badge-success':'badge-primary'); }
+}
+
+async function saveHomework(taskId, val) {
+  const pct = parseInt(val);
+  await saveTaskLog(taskId, selectedDateStr, { percent: pct, type: 'homework' });
+  updateHomeworkPct(taskId, pct);
+}
+
+async function saveLessonCheck(taskId, subItems) {
+  const checkboxes = document.querySelectorAll(`input[data-taskid="${taskId}"]`);
+  const checked = [];
+  checkboxes.forEach(cb => { if (cb.checked) checked.push(parseInt(cb.dataset.idx)); });
+  await saveTaskLog(taskId, selectedDateStr, { checkedItems: checked, type: 'lesson' });
+  const badge = document.getElementById('lesson-badge-' + taskId);
+  if (badge) {
+    const allDone = checked.length >= subItems.length;
+    badge.textContent = checked.length + '/' + subItems.length;
+    badge.className = 'badge ' + (allDone ? 'badge-success' : 'badge-muted');
+  }
+}
+
 requireAuth(() => init());
 setActiveNav('mission');
 </script>

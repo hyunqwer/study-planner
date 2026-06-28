@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#6366f1"/>
+  <!-- 작전노트 스타일: 노트 + 별 -->
+  <rect x="128" y="96" width="256" height="320" rx="20" fill="white" opacity="0.95"/>
+  <rect x="160" y="152" width="192" height="16" rx="8" fill="#6366f1" opacity="0.8"/>
+  <rect x="160" y="192" width="152" height="12" rx="6" fill="#6366f1" opacity="0.4"/>
+  <rect x="160" y="220" width="172" height="12" rx="6" fill="#6366f1" opacity="0.4"/>
+  <rect x="160" y="248" width="132" height="12" rx="6" fill="#6366f1" opacity="0.4"/>
+  <!-- 체크 아이콘 -->
+  <circle cx="256" cy="352" r="44" fill="#6366f1"/>
+  <polyline points="236,352 250,366 278,338" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

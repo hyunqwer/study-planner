@@ -4,17 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 공부 작전노트</title>
-<link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="작전노트">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- Top Nav -->
 <header class="nav-bar" style="justify-content:space-between">
   <span class="nav-logo">작전<span>노트</span></span>
-  <button class="nav-back" onclick="logout()" title="로그아웃"
-    style="width:auto;padding:6px 10px;font-size:12px;font-weight:600;color:var(--text-3)">
-    로그아웃
-  </button>
+  <div style="display:flex;align-items:center;gap:4px">
+    <a href="settings.html" title="설정"
+      style="display:flex;align-items:center;padding:6px 8px;color:var(--text-3);text-decoration:none">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </a>
+    <button class="nav-back" onclick="logout()" title="로그아웃"
+      style="width:auto;padding:6px 10px;font-size:12px;font-weight:600;color:var(--text-3)">
+      로그아웃
+    </button>
+  </div>
 </header>
 
 <main class="container">
@@ -26,13 +38,82 @@
   </div>
 
   <!-- 책 없음 -->
+  <!-- 책 없음 → 온보딩 -->
   <div id="no-book-section" style="display:none">
-    <div class="card" style="padding:40px 20px;text-align:center">
-      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 16px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      <h3 style="margin-bottom:6px">진행 중인 책이 없어요</h3>
-      <p class="text-sm text-2" style="margin-bottom:24px">새 책을 등록하고 작전을 시작해 보세요</p>
-      <a href="register.html" class="btn btn-primary btn-lg">새 책 등록하기</a>
+
+    <!-- 환영 배너 -->
+    <div class="hero-card" style="cursor:default;margin-bottom:16px">
+      <div class="hero-label">👋 환영해!</div>
+      <div class="hero-title" style="font-size:20px">작전노트에 온 걸 환영해</div>
+      <div class="hero-sub">딱 3단계면 오늘부터 바로 시작할 수 있어</div>
     </div>
+
+    <!-- 3단계 가이드 -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-label" style="margin-bottom:14px">시작 작전 3단계</div>
+
+      <div style="display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="width:32px;height:32px;min-width:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px">1</div>
+        <div>
+          <div style="font-weight:700;margin-bottom:4px">📚 교재 등록</div>
+          <div class="text-sm text-2">공부할 책 이름, 총 쪽수, 목표 날짜를 입력해. 커버 사진도 올릴 수 있어.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="width:32px;height:32px;min-width:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px">2</div>
+        <div>
+          <div style="font-weight:700;margin-bottom:4px">🗓️ 주간 계획 확인</div>
+          <div class="text-sm text-2">목표 날짜를 기준으로 요일별 분량이 자동 계산돼. 작전표에서 직접 조정할 수도 있어.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:14px;padding:12px 0">
+        <div style="width:32px;height:32px;min-width:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px">3</div>
+        <div>
+          <div style="font-weight:700;margin-bottom:4px">✅ 매일 미션 기록</div>
+          <div class="text-sm text-2">오늘 공부한 쪽수를 기록해. 완료·일부·건너뜀으로 간단히 남기면 돼.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <a href="register.html" class="btn btn-primary btn-lg w-full" style="margin-bottom:12px">
+      📖 첫 번째 교재 등록하기
+    </a>
+
+    <!-- 기능 미리보기 -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-label" style="margin-bottom:12px">작전노트에서 할 수 있는 것들</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:var(--surface-2);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:6px">📅</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px">주간 작전표</div>
+          <div style="font-size:11px;color:var(--text-3)">요일별 분량 계획</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:6px">📊</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px">주간 점검</div>
+          <div style="font-size:11px;color:var(--text-3)">AI 피드백 & 다음 주 작전</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:6px">📚</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px">독서 & AI 토론</div>
+          <div style="font-size:11px;color:var(--text-3)">완독 후 AI와 대화</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:6px">👩‍🏫</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px">멘토 연결</div>
+          <div style="font-size:11px;color:var(--text-3)">선생님·부모님과 공유</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 멘토 연결 유도 -->
+    <div class="callout callout-primary">
+      선생님이나 부모님이 멘토로 등록해 두셨다면 <a href="connect.html" style="color:var(--primary);font-weight:700">멘토 연결</a>에서 이메일로 요청해봐.
+    </div>
+
   </div>
 
   <!-- 책 있음 -->
@@ -76,13 +157,14 @@
       </div>
     </div>
 
-    <!-- 오늘 미션 리스트 -->
+    <!-- 오늘의 과제 (교재 + 과제 통합) -->
     <div class="card">
       <div class="flex items-center justify-between mb-12">
-        <div class="card-label" style="margin-bottom:0">오늘 미션</div>
+        <div class="card-label" style="margin-bottom:0">오늘의 과제</div>
         <a href="mission.html" class="text-xs text-primary font-semibold">전체 보기</a>
       </div>
       <div id="mission-list"></div>
+      <div id="today-task-list"></div>
     </div>
 
     <!-- 작전 메모 -->
@@ -138,10 +220,19 @@
       <div id="book-progress-list"></div>
     </div>
 
+    <!-- 독서 현황 -->
+    <div class="card" id="reading-home-card" style="display:none">
+      <div class="flex items-center justify-between mb-12">
+        <div class="card-label" style="margin-bottom:0">📚 독서 현황</div>
+        <a href="reading.html" style="font-size:12px;font-weight:600;color:var(--primary);text-decoration:none">전체 보기</a>
+      </div>
+      <div id="reading-home-list"></div>
+    </div>
+
     <!-- 바로가기 -->
     <div class="grid-2 mb-12">
-      <a href="parent.html" class="btn btn-outline btn-md">부모 화면</a>
-      <a href="bookshelf.html" class="btn btn-outline btn-md">책장</a>
+      <a href="review.html" class="btn btn-outline btn-md">⚔️ 작전회의</a>
+      <a href="bookshelf.html" class="btn btn-outline btn-md">학습관리</a>
     </div>
 
     <a href="register.html" class="btn btn-ghost btn-md w-full">+ 새 책 추가</a>
@@ -159,6 +250,10 @@
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     미션
   </a>
+  <a href="reading.html" data-page="reading">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    독서
+  </a>
   <a href="weekly.html" data-page="weekly">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     작전표
@@ -169,7 +264,7 @@
   </a>
   <a href="bookshelf.html" data-page="books">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-    책장
+    학습관리
   </a>
 </nav>
 
@@ -216,7 +311,6 @@ function buildAchievementNote({ todayCount, todayDoneCount, studyDays, streak, w
 }
 
 async function loadHome() {
-  showLoading(true);
   try {
     const books = await getActiveBooks();
     if (!books.length) {
@@ -346,19 +440,95 @@ async function loadHome() {
       buildStrategyMemo({ todayPages, todayCount, todayDoneCount, weekPct, overloadedDays, behindBooks });
     document.getElementById('book-progress-list').innerHTML = progressRows.join('');
     document.getElementById('week-done').textContent = weekDone;
-    document.getElementById('active-count').textContent = books.length;
-    document.getElementById('week-pct').textContent = weekGoal > 0 ? weekPct + '%' : '—';
-    document.getElementById('study-days-count').textContent = studyDates.size + '일';
+        document.getElementById('active-count').textContent = books.length;
+    document.getElementById('week-pct').textContent = weekPct > 0 ? weekPct + '%' : '—';
     document.getElementById('streak-count').textContent = streak + '일';
+    document.getElementById('study-days-count').textContent = studyDates.size + '일';
     document.getElementById('adjust-count').textContent = books.length + '권';
     document.getElementById('achievement-note').textContent =
       buildAchievementNote({ todayCount, todayDoneCount, studyDays: studyDates.size, streak, weekPct });
 
-  } catch(e) { console.error(e); }
-  finally { showLoading(false); }
+    // 독서 현황 카드
+    try {
+      const readingBooks = await getReadingBooks();
+      const readingNow = readingBooks.filter(b => b.status === 'reading');
+      if (readingNow.length) {
+        document.getElementById('reading-home-card').style.display = 'block';
+        document.getElementById('reading-home-list').innerHTML = readingNow.map(b => {
+          const total = b.totalPages || 0;
+          const cur = b.currentPage || 0;
+          const pct = total > 0 ? Math.min(100, Math.round(cur / total * 100)) : 0;
+          const progressHTML = total > 0 ? `
+            <div class="progress-track" style="margin-top:6px">
+              <div class="progress-fill" style="width:${pct}%"></div>
+            </div>
+            <div class="progress-meta mt-4">
+              <span class="text-xs text-3">${cur} / ${total}쪽</span>
+              <span class="text-xs font-bold text-primary">${pct}%</span>
+            </div>` : '';
+          return `
+            <div style="padding:10px 0;border-bottom:1px solid var(--border)" onclick="location.href='reading.html'">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold">${b.title}</span>
+                <span class="text-xs text-3">${b.genre || ''}</span>
+              </div>
+              ${progressHTML}
+            </div>`;
+        }).join('') + `
+          <a href="reading.html" class="btn btn-ghost btn-sm w-full" style="margin-top:10px">
+            📝 오늘 읽은 쪽 기록하기
+          </a>`;
+      }
+    } catch(e) { console.warn('reading home card error', e); }
+
+    // 오늘의 과제 (교재 아래 이어서 렌더)
+    try {
+      const todayStr2 = today();
+      const todayTasks = await getTasksForDay(todayDow()); // KST 기준 요일
+      if (todayTasks.length) {
+        const taskLogs = await Promise.all(todayTasks.map(t => getTaskLog(t.id, todayStr2)));
+        document.getElementById('today-task-list').innerHTML = todayTasks.map((task, i) => {
+          const log = taskLogs[i] || {};
+          if (task.type === 'homework') {
+            const pct = log.percent ?? 0;
+            return `<div class="list-item" onclick="location.href='mission.html'">
+              <div class="list-item-icon" style="font-size:16px">📋</div>
+              <div class="list-item-body">
+                <div class="list-item-title">${task.name}</div>
+                <div class="list-item-sub">주간 숙제 · 진행률 ${pct}%</div>
+              </div>
+              <span class="badge ${pct>=100?'badge-success':'badge-primary'}">${pct>=100?'완료':pct+'%'}</span>
+            </div>`;
+          } else {
+            const subItems = task.subItems?.length ? task.subItems : [task.name];
+            const checked = log.checkedItems || [];
+            const allDone = checked.length >= subItems.length;
+            return `<div class="list-item" onclick="location.href='mission.html'">
+              <div class="list-item-icon" style="font-size:16px">🎬</div>
+              <div class="list-item-body">
+                <div class="list-item-title">${task.name}</div>
+                <div class="list-item-sub">강의/학습앱 · ${checked.length}/${subItems.length} 완료</div>
+              </div>
+              <span class="badge ${allDone?'badge-success':'badge-muted'}">${allDone?'완료':checked.length+'/'+subItems.length}</span>
+            </div>`;
+          }
+        }).join('');
+      }
+    } catch(e) { console.warn('today task error', e); }
+
+
+  } catch(e) {
+    console.error('loadHome error', e);
+  }
 }
 
-requireAuth(() => loadHome());
+
+
+requireAuth(async (user) => {
+  const role = await getMyRole();
+  if (role === 'mentor') { location.href = 'mentor.html'; return; }
+  loadHome();
+});
 setActiveNav('home');
 </script>
 </body>
