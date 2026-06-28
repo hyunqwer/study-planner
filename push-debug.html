@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>푸시 알림 진단 · 작전노트</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  .sub { color: var(--text-3, #888); font-size: 13px; margin-bottom: 20px; }
+  .step {
+    border: 1px solid var(--surface-3, #e5e5e5); border-radius: var(--r, 12px);
+    padding: 14px 16px; margin-bottom: 12px; background: var(--surface-1, #fff);
+  }
+  .step-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+  .step-num { font-size: 13px; color: var(--text-3, #999); }
+  .status-dot { width: 18px; text-align: center; }
+  .step-msg { font-size: 13px; color: var(--text-2, #555); margin-top: 6px; word-break: break-all; line-height: 1.5; }
+  .step-msg.err { color: #d33; }
+  .step-msg.ok { color: #18794e; }
+  .btn {
+    display: inline-block; border: none; background: var(--primary, #4361ee); color: #fff;
+    padding: 12px 18px; border-radius: var(--r, 12px); font-size: 15px; font-weight: 600;
+    cursor: pointer; width: 100%; margin-top: 8px;
+  }
+  .btn.secondary { background: var(--surface-3, #eee); color: var(--text-1, #222); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .row-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .row-btns .btn { margin-top: 0; }
+  code { background: var(--surface-2, #f3f3f3); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔔 푸시 알림 진단</h1>
+  <p class="sub">아래 단계가 어디서 막히는지 보면 원인을 바로 알 수 있어요. 이 페이지는 다른 탭을 띄우지 말고 <b>그대로 둔 채</b> 실행하세요.</p>
+
+  <div class="step" id="step-1">
+    <div class="step-head"><span class="status-dot">⬜</span><span>브라우저 지원</span><span class="step-num">1</span></div>
+    <div class="step-msg"></div>
+  </div>
+  <div class="step" id="step-2">
+    <div class="step-head"><span class="status-dot">⬜</span><span>알림 권한</span><span class="step-num">2</span></div>
+    <div class="step-msg"></div>
+  </div>
+  <div class="step" id="step-3">
+    <div class="step-head"><span class="status-dot">⬜</span><span>서비스워커 등록</span><span class="step-num">3</span></div>
+    <div class="step-msg"></div>
+  </div>
+  <div class="step" id="step-4">
+    <div class="step-head"><span class="status-dot">⬜</span><span>FCM 토큰 발급 + 저장</span><span class="step-num">4</span></div>
+    <div class="step-msg"></div>
+  </div>
+  <div class="step" id="step-5">
+    <div class="step-head"><span class="status-dot">⬜</span><span>서버에서 즉시 발송</span><span class="step-num">5</span></div>
+    <div class="step-msg"></div>
+  </div>
+
+  <button class="btn" id="run-btn" onclick="runAll()">전체 진단 실행</button>
+  <button class="btn" style="background:#d9480f;margin-top:8px" onclick="testDisplayOnly()">🖥️ 표시 기능만 테스트 (FCM 제외)</button>
+  <div class="row-btns">
+    <button class="btn secondary" onclick="requestPerm()">알림 권한 요청</button>
+    <button class="btn secondary" onclick="sendTest()">테스트 알림만 보내기</button>
+  </div>
+  <div class="step" id="step-display" style="margin-top:12px">
+    <div class="step-head"><span class="status-dot">⬜</span><span>브라우저 직접 표시 테스트</span></div>
+    <div class="step-msg">위 주황 버튼을 누르면 FCM 없이 브라우저가 직접 알림을 띄웁니다. 이것조차 안 뜨면 100% Chrome/Windows 설정 문제예요.</div>
+  </div>
+  <p class="sub" style="margin-top:16px">
+    <b>핵심 판단:</b> "표시 기능만 테스트"에서 알림이 <b>안 뜨면</b> → 코드/FCM 문제 아님. 아래를 확인하세요:<br>
+    ① Windows <code>설정 &gt; 시스템 &gt; 알림</code> 켜짐 + <b>Google Chrome</b> 항목 켜짐<br>
+    ② Windows <b>집중 지원/방해 금지</b> 꺼짐<br>
+    ③ Chrome <code>설정 &gt; 알림</code>에서 "Chrome이 시스템 알림 사용" 관련 설정, 사이트가 차단 목록에 없는지<br>
+    ④ 이 탭을 최소화한 상태에서 다시 시도 (포그라운드 확인)
+  </p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const FUNCTIONS_BASE = 'https://us-central1-selfstudy-planner.cloudfunctions.net';
+
+function setStep(id, state, msg) {
+  const el = document.getElementById(id);
+  const dot = el.querySelector('.status-dot');
+  const m = el.querySelector('.step-msg');
+  dot.textContent = state === 'ok' ? '✅' : state === 'err' ? '❌' : state === 'warn' ? '⚠️' : '⏳';
+  m.textContent = msg || '';
+  m.className = 'step-msg ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');
+}
+
+// 1. 브라우저 지원
+function checkSupport() {
+  const missing = [];
+  if (!('Notification' in window)) missing.push('Notification API');
+  if (!('serviceWorker' in navigator)) missing.push('Service Worker');
+  if (!firebase.messaging || !firebase.messaging.isSupported) missing.push('firebase messaging');
+  if (missing.length) { setStep('step-1', 'err', '미지원: ' + missing.join(', ')); return false; }
+  setStep('step-1', 'ok', '모든 기능 지원됨');
+  return true;
+}
+
+// 2. 권한
+function checkPerm() {
+  const p = Notification.permission;
+  if (p === 'granted') { setStep('step-2', 'ok', '권한 허용됨 (granted)'); return true; }
+  if (p === 'denied') { setStep('step-2', 'err', '권한 차단됨 (denied). 주소창 🔒 → 알림 → 허용으로 변경 후 새로고침하세요.'); return false; }
+  setStep('step-2', 'warn', '아직 미결정 (default). "알림 권한 요청" 버튼을 누르세요.'); return false;
+}
+
+// 3. 서비스워커
+async function checkSW() {
+  try {
+    let reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (!reg) reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    await navigator.serviceWorker.ready;
+    setStep('step-3', 'ok', 'firebase-messaging-sw.js 등록됨 (scope: ' + reg.scope + ')');
+    return true;
+  } catch (e) {
+    setStep('step-3', 'err', '서비스워커 등록 실패: ' + e.message);
+    return false;
+  }
+}
+
+// 4. 토큰
+async function checkToken() {
+  try {
+    const token = await registerFcmToken();
+    if (!token) { setStep('step-4', 'err', '토큰이 비어 있습니다. VAPID 키 또는 권한을 확인하세요.'); return false; }
+    setStep('step-4', 'ok', 'Firestore 저장 완료. 토큰: ' + token.slice(0, 24) + '…');
+    return true;
+  } catch (e) {
+    setStep('step-4', 'err', '토큰 발급 실패: ' + (e.code || '') + ' ' + e.message + '  (VAPID 키 불일치가 가장 흔한 원인)');
+    return false;
+  }
+}
+
+// 5. 서버 발송
+async function checkSend() {
+  setStep('step-5', 'pending', '서버 호출 중…');
+  try {
+    const res = await fetch(FUNCTIONS_BASE + '/sendTestPush', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: USER_ID }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setStep('step-5', 'ok', '발송 성공 (id: ' + (data.messageId || '').slice(-12) + '). 잠시 후 알림이 떠야 합니다.');
+      return true;
+    }
+    setStep('step-5', 'err', `발송 실패 [${data.step}]: ${data.message}`);
+    return false;
+  } catch (e) {
+    setStep('step-5', 'err', '서버 호출 실패: ' + e.message + '  (sendTestPush 함수 배포 여부 확인)');
+    return false;
+  }
+}
+
+async function runAll() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = '진단 중…';
+  if (checkSupport() && checkPerm()) {
+    if (await checkSW() && await checkToken()) {
+      await checkSend();
+    }
+  }
+  btn.disabled = false; btn.textContent = '전체 진단 다시 실행';
+}
+
+async function requestPerm() {
+  const p = await Notification.requestPermission();
+  checkPerm();
+  if (p === 'granted') { await checkSW(); await checkToken(); }
+}
+
+async function sendTest() {
+  if (Notification.permission !== 'granted') { alert('먼저 알림 권한을 허용하세요.'); return; }
+  await checkToken();
+  await checkSend();
+}
+
+// FCM을 완전히 빼고, 브라우저의 알림 표시 능력만 직접 테스트
+async function testDisplayOnly() {
+  function set(state, msg) {
+    const el = document.getElementById('step-display');
+    el.querySelector('.status-dot').textContent = state === 'ok' ? '✅' : state === 'err' ? '❌' : '⏳';
+    const m = el.querySelector('.step-msg');
+    m.textContent = msg; m.className = 'step-msg ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');
+  }
+  if (Notification.permission !== 'granted') { set('err', '권한이 granted가 아닙니다. 먼저 권한을 허용하세요.'); return; }
+  set('pending', '표시 시도 중…');
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('🖥️ 직접 표시 테스트', {
+      body: '이 알림이 보이면 브라우저/OS 표시는 정상입니다. (FCM 미사용)',
+      icon: '/icons/icon-192.png',
+      requireInteraction: true,
+    });
+    set('ok', '호출 성공. 화면에 알림이 떴나요?  • 떴으면 → 표시는 정상, FCM 전달 경로 문제입니다.  • 안 떴으면 → Chrome/Windows 알림 설정 문제(아래 ①~③).');
+  } catch (e) {
+    set('err', 'showNotification 실패: ' + e.message);
+  }
+}
+
+requireAuth(() => {
+  setupForegroundMessages();
+  checkSupport();
+  checkPerm();
+});
+</script>
+</body>
+</html>

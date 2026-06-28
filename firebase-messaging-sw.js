@@ -17,12 +17,18 @@ const messaging = firebase.messaging();
 
 // 백그라운드 메시지 수신 처리
 messaging.onBackgroundMessage((payload) => {
-  const { title, body, icon, click_action } = payload.notification || {};
-  self.registration.showNotification(title || '작전노트', {
-    body: body || '',
-    icon: icon || '/icons/icon-192.png',
+  // data-only 메시지 우선, notification 페이로드는 폴백
+  const d = payload.data || {};
+  const n = payload.notification || {};
+  const title    = d.title || n.title || '작전노트';
+  const body     = d.body  || n.body  || '';
+  const icon     = d.icon  || n.icon  || '/icons/icon-192.png';
+  const clickUrl = d.click_action || '/';
+  self.registration.showNotification(title, {
+    body,
+    icon,
     badge: '/icons/badge-72.png',
-    data: { url: click_action || '/' },
+    data: { url: clickUrl },
     vibrate: [200, 100, 200],
   });
 });

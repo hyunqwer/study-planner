@@ -306,16 +306,42 @@ async function getUserSettings() {
 const VAPID_KEY = 'BNz1jKeLR5YDcNeHfg_yWA6uBs0C8-0FkgY_hlDsQ8OxrKVf4rRzvtHLWquoQ-jiEqGaDZjSuQ-8INthRGu_UOo'; // ← Firebase 콘솔에서 발급 후 교체
 
 async function registerFcmToken() {
+  if (!firebase.messaging) throw new Error('이 브라우저에서 firebase messaging을 사용할 수 없습니다.');
+  const messaging = firebase.messaging();
+  const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+  if (token) {
+    await db.collection('users').doc(USER_ID).update({ fcmToken: token, fcmUpdatedAt: new Date().toISOString() });
+    console.log('FCM token registered');
+  }
+  return token; // 진단/표시용으로 토큰 반환 (에러는 호출부로 전파)
+}
+
+// 포그라운드(탭이 열려있을 때) 알림 표시
+// FCM은 탭이 활성화돼 있으면 자동으로 알림을 띄우지 않으므로 직접 처리해야 함
+function setupForegroundMessages() {
+  if (!firebase.messaging) return;
   try {
-    if (!firebase.messaging) return;
     const messaging = firebase.messaging();
-    const token = await messaging.getToken({ vapidKey: VAPID_KEY });
-    if (token) {
-      await db.collection('users').doc(USER_ID).update({ fcmToken: token, fcmUpdatedAt: new Date().toISOString() });
-      console.log('FCM token registered');
-    }
+    messaging.onMessage(async (payload) => {
+      const d = payload.data || {};
+      const n = payload.notification || {};
+      const title    = d.title || n.title || '작전노트';
+      const body     = d.body  || n.body  || '';
+      const icon     = d.icon  || n.icon  || '/icons/icon-192.png';
+      const clickUrl = d.click_action || '/';
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          // new Notification()보다 서비스워커 showNotification이 더 안정적 (특히 SW 제어 페이지)
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification(title, { body, icon, data: { url: clickUrl } });
+        } catch (e) {
+          console.warn('showNotification failed:', e.message);
+        }
+      }
+      if (typeof showToast === 'function') showToast(`🔔 ${title}`);
+    });
   } catch(e) {
-    console.warn('FCM token error:', e.message);
+    console.warn('Foreground message setup error:', e.message);
   }
 }
 

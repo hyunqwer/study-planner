@@ -448,22 +448,22 @@ exports.sendDailyPush = onSchedule(
       const nickname = user.nickname || user.email?.split('@')[0] || '친구';
       const message = hasTodayLog
         ? {
-            notification: {
+            data: {
               title: `${nickname}, 오늘도 완료! 🎉`,
               body: '오늘 공부 기록을 남겼어. 이 습관이 쌓이면 진짜 실력이 돼. 내일도 파이팅!',
+              click_action: '/index.html',
             },
-            data: { click_action: '/index.html' },
           }
         : {
-            notification: {
+            data: {
               title: `${nickname}, 오늘 기록 남겼어? 📖`,
               body: '오늘 공부한 내용을 작전노트에 남겨봐. 아주 짧아도 괜찮아!',
+              click_action: '/mission.html',
             },
-            data: { click_action: '/mission.html' },
           };
 
       try {
-        await admin.messaging().send({ token: fcmToken, ...message });
+        await admin.messaging().send({ token: fcmToken, ...message, webpush: { headers: { Urgency: 'high' } } });
         console.log(`Daily push sent to ${userDoc.id}`);
       } catch (e) {
         console.warn(`Push failed for ${userDoc.id}:`, e.message);
@@ -501,11 +501,12 @@ exports.sendWeeklyPush = onSchedule(
       try {
         await admin.messaging().send({
           token: fcmToken,
-          notification: {
+          data: {
             title: `${nickname}, 주간 작전 시간이야! ⚔️`,
             body: '이번 주를 돌아보고 다음 주 작전을 세워봐. 5분이면 충분해!',
+            click_action: '/review.html',
           },
-          data: { click_action: '/review.html' },
+          webpush: { headers: { Urgency: 'high' } },
         });
         console.log(`Weekly push sent to ${userDoc.id}`);
       } catch (e) {
@@ -514,6 +515,70 @@ exports.sendWeeklyPush = onSchedule(
     });
 
     await Promise.allSettled(sends);
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// sendTestPush — POST /sendTestPush
+// Body: { uid }
+// 해당 유저의 fcmToken으로 즉시 테스트 알림 발송 (진단용)
+// Response: { ok, step, message, tokenPreview }
+// ─────────────────────────────────────────────────────────────
+exports.sendTestPush = onRequest(
+  { cors: true, timeoutSeconds: 30, memory: '256MiB' },
+  async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+      return res.status(204).send('');
+    }
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, step: 'method', message: 'POST만 허용됩니다.' });
+
+    const { uid } = req.body || {};
+    if (!uid) return res.status(400).json({ ok: false, step: 'input', message: 'uid가 필요합니다.' });
+
+    try {
+      const db = admin.firestore();
+      const snap = await db.collection('users').doc(uid).get();
+      if (!snap.exists) {
+        return res.status(404).json({ ok: false, step: 'user', message: '유저 문서를 찾을 수 없습니다.' });
+      }
+      const token = snap.data().fcmToken;
+      if (!token) {
+        return res.json({ ok: false, step: 'token', message: 'Firestore에 fcmToken이 없습니다. 알림 권한 허용 후 토큰 등록이 필요합니다.' });
+      }
+
+      try {
+        const id = await admin.messaging().send({
+          token,
+          // data-only: 웹에서 SW/포그라운드 핸들러가 직접 표시 (자동표시 함정 회피)
+          data: {
+            title: '🔔 테스트 알림',
+            body: '이 알림이 보이면 푸시 파이프라인이 정상이에요!',
+            click_action: '/index.html',
+          },
+          webpush: { headers: { Urgency: 'high' } },
+        });
+        return res.json({
+          ok: true,
+          step: 'sent',
+          message: '발송 성공',
+          messageId: id,
+          tokenPreview: token.slice(0, 16) + '…',
+        });
+      } catch (e) {
+        // 토큰 만료/무효 등 발송 단계 에러를 그대로 노출
+        return res.json({
+          ok: false,
+          step: 'send',
+          message: `발송 실패: ${e.code || ''} ${e.message}`,
+          tokenPreview: token.slice(0, 16) + '…',
+        });
+      }
+    } catch (e) {
+      return res.status(500).json({ ok: false, step: 'server', message: e.message });
+    }
   }
 );
 
@@ -753,11 +818,12 @@ exports.autoWeeklyReport = onSchedule(
             if (mentorData.fcmToken) {
               await admin.messaging().send({
                 token: mentorData.fcmToken,
-                notification: {
+                data: {
                   title: `${nickname}의 주간 리포트 도착 📊`,
                   body: `이번 주 달성률 ${weekPct}%. 대시보드에서 확인해 보세요!`,
+                  click_action: '/mentor.html',
                 },
-                data: { click_action: '/mentor.html' },
+                webpush: { headers: { Urgency: 'high' } },
               }).catch(e => console.warn('FCM 전송 실패:', e.message));
             }
           } catch (e) {
