@@ -83,6 +83,23 @@
     </div>
   </div>
 
+  <!-- ─── 테마 ─── -->
+  <div class="settings-title">테마</div>
+  <div class="settings-section" id="theme-cards"></div>
+
+  <!-- ─── RIVALS 무기 매핑 (rivals 테마일 때만 노출) ─── -->
+  <div id="rivals-config" style="display:none">
+    <div class="settings-title">⚔️ RIVALS 무기 매핑</div>
+    <div class="settings-section" style="background:var(--surface-1);border-radius:var(--r);padding:14px 16px">
+      <p class="settings-sub" style="margin-bottom:10px">과목마다 무기를 하나씩 정해줘. 같은 과목 숙제는 그 무기 실력으로 쌓여.</p>
+      <div id="subject-weapon-list"></div>
+      <div id="task-subject-block" style="margin-top:14px;display:none">
+        <div class="settings-sub" style="font-weight:700;color:var(--text-2);margin-bottom:6px">과제를 과목에 배정</div>
+        <div id="task-subject-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── 멘토 연결 ─── -->
   <div class="settings-title">멘토 연결</div>
   <div class="settings-section">
@@ -230,6 +247,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="app.js"></script>
+<script src="game.js"></script>
 <script>
 let currentSettings = {};
 let selectedWeeklyDay = 0; // 일요일 기본
@@ -431,6 +449,145 @@ async function savePushSettings() {
   showToast('알림 설정 저장 완료 ✓');
 }
 
+// ── 테마 선택 ───────────────────────────────────────────
+function renderThemeCards() {
+  const current = getThemeId(currentSettings);
+  const wrap = document.getElementById('theme-cards');
+  wrap.innerHTML = Object.values(THEME_REGISTRY).map(t => `
+    <div class="settings-row" style="cursor:pointer" onclick="selectTheme('${t.id}')">
+      <div>
+        <div class="settings-label">${t.emoji} ${t.label}${t.id===current?' <span style="color:var(--primary)">✓</span>':''}</div>
+        <div class="settings-sub">${t.desc}</div>
+      </div>
+      <div class="settings-value">${t.id===current?'사용 중':'선택'}</div>
+    </div>`).join('');
+}
+
+async function selectTheme(themeId) {
+  if (!THEME_REGISTRY[themeId]) return;
+  currentSettings.theme = themeId;
+  await saveUserSettings({ theme: themeId });
+  try { localStorage.setItem('theme', themeId); } catch(e){}
+  showToast(`${THEME_REGISTRY[themeId].emoji} ${THEME_REGISTRY[themeId].label} 적용!`);
+  renderThemeCards();
+  await renderRivalsConfig();
+}
+
+// ── RIVALS 무기 매핑 ────────────────────────────────────
+let _rivTasks = [], _winBySubject = {};
+async function renderRivalsConfig() {
+  const show = getThemeId(currentSettings) === 'rivals';
+  document.getElementById('rivals-config').style.display = show ? 'block' : 'none';
+  if (!show) return;
+
+  // 실제 게임 엔진으로 과목/승수/레벨 계산 (MAX 판정·이적 baseline에 사용)
+  const [state, tasks] = await Promise.all([loadGameState(), getTasks()]);
+  _rivTasks = tasks;
+  _winBySubject = {};
+  state.weapons.forEach(w => { _winBySubject[w.subject] = w.wins; });
+
+  const weaponMap = currentSettings.weaponMap || {};
+  const weaponMeta = currentSettings.weaponMeta || {};
+  const subjects = state.weapons.map(w => w.subject);
+
+  const weaponOptions = (sel) => WEAPON_CATS.map(c =>
+    `<optgroup label="${c.label}">` +
+    WEAPONS.filter(w=>w.cat===c.id).map(w =>
+      `<option value="${w.id}" ${w.id===sel?'selected':''}>${w.emoji} ${w.name}</option>`).join('') +
+    `</optgroup>`).join('');
+
+  document.getElementById('subject-weapon-list').innerHTML = subjects.length
+    ? state.weapons.map(w => {
+        const s = w.subject;
+        const meta = weaponMeta[s] || {};
+        const isMax = w.progress.isMax;
+        const star = '★'.repeat(meta.prestige||0);
+        return `
+        <div id="weapon-${s}" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-weight:700;min-width:64px">${s} <span style="color:#f5b301">${star}</span></span>
+            <select class="form-input" style="flex:1" onchange="setWeapon('${s}', this.value)">
+              <option value="">무기 선택…</option>
+              ${weaponOptions(weaponMap[s]||'')}
+            </select>
+          </div>
+          <div class="settings-sub" style="padding-left:2px;margin-top:2px">Lv${w.level} ${w.tier.label} · ${w.wins}승</div>
+          ${isMax ? `<div style="margin-top:6px;display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="prestigeWeapon('${s}')">⭐ 프레스티지(계속 키우기)</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="retireWeapon('${s}')">🔄 새 무기로 이적</button>
+          </div>` : ''}
+        </div>`;
+      }).join('')
+    : `<p class="settings-sub">아직 등록된 교재·과제가 없어. 먼저 과제를 추가해줘!</p>`;
+
+  // 과제 과목 배정 (과제는 subject가 없을 수 있음)
+  const taskBlock = document.getElementById('task-subject-block');
+  if (_rivTasks.length) {
+    taskBlock.style.display = 'block';
+    const subjOptions = (sel) => subjects.map(s =>
+      `<option value="${s}" ${s===sel?'selected':''}>${s}</option>`).join('');
+    document.getElementById('task-subject-list').innerHTML = _rivTasks.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+        <span style="flex:1;font-size:13px">${t.name}</span>
+        <select class="form-input" style="width:120px" onchange="setTaskSubject('${t.id}', this.value)">
+          ${subjOptions(t.subject||'기타')}
+          <option value="__new__">+ 새 과목…</option>
+        </select>
+      </div>`).join('');
+  } else {
+    taskBlock.style.display = 'none';
+  }
+}
+
+async function setWeapon(subject, weaponId) {
+  const map = currentSettings.weaponMap || {};
+  if (weaponId) map[subject] = weaponId; else delete map[subject];
+  currentSettings.weaponMap = map;
+  await saveUserSettings({ weaponMap: map });
+  showToast('무기 장착 완료 ⚔️');
+}
+
+async function setTaskSubject(taskId, value) {
+  let subject = value;
+  if (value === '__new__') {
+    subject = (prompt('새 과목 이름을 입력해줘') || '').trim();
+    if (!subject) { renderRivalsConfig(); return; }
+  }
+  await updateTask(taskId, { subject });
+  showToast(`과목 "${subject}"에 배정`);
+  await renderRivalsConfig();
+}
+
+async function prestigeWeapon(subject) {
+  const meta = currentSettings.weaponMeta || {};
+  meta[subject] = meta[subject] || {};
+  meta[subject].prestige = (meta[subject].prestige || 0) + 1;
+  currentSettings.weaponMeta = meta;
+  await saveUserSettings({ weaponMeta: meta });
+  showToast(`⭐ ${subject} 프레스티지 ${meta[subject].prestige}!`);
+  await renderRivalsConfig();
+}
+
+async function retireWeapon(subject) {
+  if (!confirm(`${subject}의 현재 무기를 명예의 전당에 보내고 새 무기를 장착할까?\n(지금까지 키운 실력은 훈장으로 남아.)`)) return;
+  const map = currentSettings.weaponMap || {};
+  const meta = currentSettings.weaponMeta || {};
+  meta[subject] = meta[subject] || {};
+  const oldWeapon = map[subject];
+  meta[subject].retired = meta[subject].retired || [];
+  if (oldWeapon) meta[subject].retired.push({ weaponId: oldWeapon, at: today() });
+  // 새 무기는 Lv1부터: 현재까지의 누적 XP를 baseline으로 고정
+  const curWins = _winBySubject[subject] || 0;
+  meta[subject].xpBaseline = curWins * GAME.XP_PER_WIN;
+  meta[subject].prestige = 0;
+  delete map[subject];
+  currentSettings.weaponMap = map;
+  currentSettings.weaponMeta = meta;
+  await saveUserSettings({ weaponMap: map, weaponMeta: meta });
+  showToast('🔄 새 무기를 골라줘!');
+  await renderRivalsConfig();
+}
+
 // ── 초기화 ──────────────────────────────────────────────
 async function init() {
   const user = firebase.auth().currentUser;
@@ -458,6 +615,8 @@ async function init() {
 
   checkPushPermission();
   setupForegroundMessages(); // 탭이 열려있을 때도 알림 표시
+  renderThemeCards();
+  await renderRivalsConfig();
   await loadMentorSection();
 
   // 멘토 전용: 리포트 스케줄 섹션 표시

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIVALS 작전 — 작전노트</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b1020">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RIVALS 작전">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { visibility: hidden; }
+  .hud {
+    background: linear-gradient(135deg, #11162b, #1b2347);
+    color: #fff; border-radius: var(--r); padding: 16px; margin-bottom: 14px;
+    box-shadow: 0 6px 20px rgba(15,20,45,.18);
+  }
+  .hud-top { display:flex; align-items:center; justify-content:space-between; }
+  .rank-badge { display:flex; align-items:center; gap:10px; }
+  .rank-emblem {
+    width:46px; height:46px; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:22px; background:rgba(255,255,255,.1);
+    border:2px solid var(--rank-color,#888);
+  }
+  .rank-name { font-size:17px; font-weight:800; line-height:1.1; }
+  .rank-elo  { font-size:12px; opacity:.8; }
+  .streak { text-align:right; }
+  .streak-num { font-size:20px; font-weight:800; }
+  .streak-lbl { font-size:11px; opacity:.8; }
+  .form-row { display:flex; gap:5px; margin-top:12px; }
+  .form-dot { width:14px; height:14px; border-radius:50%; background:#3a4570; }
+  .form-dot.win { background:#10b981; }
+  .form-dot.partial { background:#f5b301; }
+  .form-dot.loss { background:#ef4444; }
+  .form-dot.rest { background:#3a4570; opacity:.5; }
+  .wl { font-size:12px; opacity:.85; margin-top:10px; }
+
+  .section-title { font-size:14px; font-weight:800; margin:18px 0 8px; display:flex; align-items:center; gap:6px; }
+
+  .match-card {
+    border:1px solid var(--surface-3); border-radius:var(--r); padding:14px;
+    background:var(--surface-1); margin-bottom:14px;
+  }
+  .match-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .match-result { font-size:13px; font-weight:800; padding:4px 10px; border-radius:20px; }
+  .res-mvp     { background:#dcfce7; color:#15803d; }
+  .res-partial { background:#fef9c3; color:#a16207; }
+  .res-pending { background:var(--surface-3); color:var(--text-2); }
+  .wgroup { margin-bottom:10px; }
+  .wgroup-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; margin-bottom:4px; }
+  .witem { display:flex; align-items:center; justify-content:space-between; font-size:13px;
+    color:var(--text-2); padding:3px 0 3px 28px; }
+  .witem .dot { color:#10b981; font-weight:800; }
+  .witem .pend { color:var(--text-3); }
+
+  .weapon-card {
+    border:1px solid var(--surface-3); border-radius:var(--r); padding:12px 14px;
+    background:var(--surface-1); margin-bottom:10px;
+  }
+  .weapon-top { display:flex; align-items:center; gap:10px; }
+  .weapon-emoji { font-size:24px; }
+  .weapon-name { font-weight:800; font-size:15px; }
+  .weapon-sub  { font-size:12px; color:var(--text-3); }
+  .lvl-badge { margin-left:auto; font-size:12px; font-weight:800; padding:3px 8px; border-radius:8px;
+    background:var(--tier-color,#9ba3bf); color:#fff; }
+  .bar { height:8px; background:var(--surface-3); border-radius:6px; overflow:hidden; margin-top:8px; }
+  .bar > i { display:block; height:100%; background:var(--tier-color,#4f6ef7); border-radius:6px; }
+  .bar-meta { display:flex; justify-content:space-between; font-size:11px; color:var(--text-3); margin-top:4px; }
+  .star { color:#f5b301; }
+  .unmapped-note {
+    background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:var(--r);
+    padding:12px 14px; font-size:13px; margin-bottom:12px; line-height:1.5;
+  }
+  .empty { text-align:center; color:var(--text-3); padding:30px 0; font-size:14px; }
+</style>
+</head>
+<body>
+
+<header class="nav-bar" style="justify-content:space-between">
+  <span class="nav-logo">⚔️ RIVALS<span> 작전</span></span>
+  <div style="display:flex;align-items:center;gap:4px">
+    <a href="settings.html" title="설정" style="display:flex;align-items:center;padding:6px 8px;color:var(--text-3);text-decoration:none">⚙️</a>
+    <button class="nav-back" onclick="logout()" title="로그아웃" style="width:auto;padding:6px 10px;font-size:12px;font-weight:600;color:var(--text-3)">로그아웃</button>
+  </div>
+</header>
+
+<main class="container">
+  <div id="loading" class="empty">전적 불러오는 중…</div>
+  <div id="content" style="display:none">
+
+    <!-- 랭크 HUD -->
+    <div class="hud" id="hud"></div>
+
+    <!-- 미배정 안내 -->
+    <div id="unmapped" style="display:none"></div>
+
+    <!-- 오늘의 매치 -->
+    <div class="section-title">⚔ 오늘의 매치</div>
+    <div class="match-card" id="match"></div>
+
+    <!-- 무기고 -->
+    <div class="section-title">🔧 무기고 (Arsenal)</div>
+    <div id="arsenal"></div>
+
+  </div>
+</main>
+
+<!-- Bottom Nav (홈 = rivals) -->
+<nav class="bottom-nav">
+  <a href="rivals.html" data-page="home" class="active">⚔️<br>작전홈</a>
+  <a href="mission.html" data-page="mission">🎯<br>미션</a>
+  <a href="weekly.html" data-page="weekly">📅<br>작전표</a>
+  <a href="review.html" data-page="review">📊<br>점검</a>
+  <a href="bookshelf.html" data-page="books">📚<br>관리</a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+<script src="game.js"></script>
+<script>
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderHud(p) {
+  const formDots = p.form.map(f => `<span class="form-dot ${f}"></span>`).join('');
+  document.getElementById('hud').innerHTML = `
+    <div class="hud-top">
+      <div class="rank-badge">
+        <div class="rank-emblem" style="--rank-color:${p.rank.color}">🎖</div>
+        <div>
+          <div class="rank-name">${esc(p.rank.label)}</div>
+          <div class="rank-elo">ELO ${p.elo}</div>
+        </div>
+      </div>
+      <div class="streak">
+        <div class="streak-num">🔥 ${p.streak}</div>
+        <div class="streak-lbl">연승</div>
+      </div>
+    </div>
+    <div class="form-row">${formDots}</div>
+    <div class="wl">최근 ${GAME.FORM_WINDOW}일 · ${p.recentWins}승 ${p.recentLosses}패 · 누적 ${p.totalWins}승</div>
+  `;
+}
+
+function renderMatch(m) {
+  const resMap = {
+    mvp:     ['res-mvp', '🏆 MVP 승리'],
+    partial: ['res-partial', `판정승 ${m.won}/${m.total}`],
+    pending: ['res-pending', `대기 ${m.won}/${m.total}`],
+    rest:    ['res-pending', '오늘은 휴식일'],
+  };
+  const [cls, label] = resMap[m.result] || resMap.pending;
+  let body;
+  if (m.total === 0) {
+    body = `<div class="empty" style="padding:14px 0">오늘 예정된 작전이 없어요. 🛌</div>`;
+  } else {
+    body = m.groups.map(g => `
+      <div class="wgroup">
+        <div class="wgroup-head">${g.weapon.emoji} ${esc(g.weapon.name)} <span class="weapon-sub">· ${esc(g.subject)}</span></div>
+        ${g.items.map(it => `
+          <div class="witem">
+            <span>${esc(it.name)}</span>
+            <span class="${it.done?'dot':'pend'}">${it.done?'승 ✓':'○ 대기'}</span>
+          </div>`).join('')}
+      </div>`).join('');
+    body += `<a href="mission.html" class="btn btn-primary btn-md w-full" style="margin-top:6px">미션에서 완료하기 →</a>`;
+  }
+  document.getElementById('match').innerHTML = `
+    <div class="match-head">
+      <span style="font-weight:800">오늘의 전투</span>
+      <span class="match-result ${cls}">${label}</span>
+    </div>${body}`;
+}
+
+function renderArsenal(weapons) {
+  const mapped = weapons.filter(w => w.mapped);
+  if (!mapped.length) {
+    document.getElementById('arsenal').innerHTML =
+      `<div class="empty">아직 무기가 없어요. 설정에서 과목에 무기를 매핑해봐!</div>`;
+    return;
+  }
+  document.getElementById('arsenal').innerHTML = mapped.map(w => {
+    const stars = '★'.repeat(w.prestige);
+    const barLabel = w.progress.isMax
+      ? `MAX${w.prestige?` · 프레스티지 ${w.prestige}`:''}`
+      : `${w.xp} / ${w.progress.next} XP`;
+    return `
+    <div class="weapon-card">
+      <div class="weapon-top">
+        <span class="weapon-emoji">${w.weapon.emoji}</span>
+        <div>
+          <div class="weapon-name">${esc(w.weapon.name)} <span class="star">${stars}</span></div>
+          <div class="weapon-sub">${esc(w.subject)} · ${w.wins}승</div>
+        </div>
+        <span class="lvl-badge" style="--tier-color:${w.tier.color}">Lv${w.level} ${w.tier.label}</span>
+      </div>
+      <div class="bar" style="--tier-color:${w.tier.color}"><i style="width:${w.progress.pct}%"></i></div>
+      <div class="bar-meta"><span>${w.progress.isMax?'최고 레벨 도달! 🎉':'다음 레벨까지'}</span><span>${barLabel}</span></div>
+      ${w.progress.isMax ? `<a href="settings.html#weapon-${esc(w.subject)}" class="btn btn-ghost btn-sm w-full" style="margin-top:8px">⭐ 프레스티지 / 새 무기로 이적</a>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderUnmapped(subjects) {
+  if (!subjects.length) return;
+  const el = document.getElementById('unmapped');
+  el.style.display = 'block';
+  el.className = 'unmapped-note';
+  el.innerHTML = `🔫 아직 무기가 없는 과목: <b>${subjects.map(esc).join(', ')}</b><br>
+    <a href="settings.html" style="color:#9a3412;font-weight:700;text-decoration:underline">설정에서 무기 매핑하기 →</a>`;
+}
+
+requireAuth(async () => {
+  try {
+    const state = await loadGameState();
+    renderHud(state.player);
+    renderMatch(state.todayMatch);
+    renderArsenal(state.weapons);
+    renderUnmapped(state.unmappedSubjects);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('loading').textContent = '불러오기 실패: ' + e.message;
+  }
+});
+setActiveNav('home');
+</script>
+</body>
+</html>

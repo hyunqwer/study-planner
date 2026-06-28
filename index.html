@@ -525,8 +525,10 @@ async function loadHome() {
 
 
 requireAuth(async (user) => {
-  const role = await getMyRole();
-  if (role === 'mentor') { location.href = 'mentor.html'; return; }
+  const profile = await getUserProfile(user.uid) || {};
+  if (profile.role === 'mentor') { location.href = 'mentor.html'; return; }
+  // 테마 라우팅: rivals 테마면 RIVALS 작전 홈을 메인으로
+  if (profile.theme === 'rivals') { location.replace('rivals.html'); return; }
   loadHome();
 });
 setActiveNav('home');
